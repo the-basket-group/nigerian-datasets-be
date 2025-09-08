@@ -4,6 +4,7 @@ from typing import TypedDict
 from urllib.parse import urlencode
 from uuid import uuid4
 
+from django.http import HttpResponseRedirect
 import requests
 from django.shortcuts import redirect
 from rest_framework.request import Request
@@ -23,7 +24,7 @@ class GoogleUserInfoResponse(TypedDict):
 
 
 class InitialGoogleSignInView(APIView):
-    def get(self, request):
+    def get(self, request: Request) -> Response:
         base_url = "https://accounts.google.com/o/oauth2/v2/auth"
         query_params = urlencode(
             {
@@ -43,7 +44,7 @@ class InitialGoogleSignInView(APIView):
 
 
 class GoogleAuthCallbackView(APIView):
-    def get(self, request: Request):
+    def get(self, request: Request) -> HttpResponseRedirect:
         try:
             code = request.GET.get("code")
             token_response = requests.post(

@@ -6,14 +6,14 @@ load_dotenv()
 
 
 class Config:
-    GOOGLE_CLIENT_ID: str
-    GOOGLE_CLIENT_SECRET: str
-    GOOGLE_REDIRECT_URI: str
+    GOOGLE_CLIENT_ID: str | None
+    GOOGLE_CLIENT_SECRET: str | None
+    GOOGLE_REDIRECT_URI: str | None
     GOOGLE_AUTH_SCOPE: list[str]
-    FRONTEND_URL: str
-    JWT_ACCESS_TOKEN_SECRET: str
+    FRONTEND_URL: str | None
+    JWT_ACCESS_TOKEN_SECRET: str | None
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
         self.GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
         self.GOOGLE_REDIRECT_URI = os.getenv(
