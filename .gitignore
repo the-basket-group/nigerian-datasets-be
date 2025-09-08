@@ -25,3 +25,5 @@ db.sqlite3
 # Django files
 media/
 staticfiles/
+
+.vscode/
