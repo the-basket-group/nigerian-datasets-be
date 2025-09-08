@@ -32,7 +32,7 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ["email"]
 
     def create_access_token(self) -> str:
-        user_data = {"id": self.pk, "email": self.email, "role": self.role}
+        user_data = {"id": str(self.id), "email": self.email, "role": self.role}
         return jwt.encode(
             user_data, application_config.JWT_ACCESS_TOKEN_SECRET, "HS256"
         )

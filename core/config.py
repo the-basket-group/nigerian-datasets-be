@@ -17,7 +17,7 @@ class Config:
         self.GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
         self.GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
         self.GOOGLE_REDIRECT_URI = os.getenv(
-            "GOOGLE_REDIRECT_URI", "http://localhost:8000/api/v1/users/google/callback"
+            "GOOGLE_REDIRECT_URI", "http://localhost:8000/api/v1/users/google/callback/"
         )
         self.GOOGLE_AUTH_SCOPE = os.getenv("GOOGLE_AUTH_SCOPE", "email,profile").split(
             ","
