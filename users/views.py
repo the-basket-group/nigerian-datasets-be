@@ -7,6 +7,7 @@ from uuid import uuid4
 import requests
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
+from rest_framework.exceptions import APIException
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -25,6 +26,12 @@ class GoogleUserInfoResponse(TypedDict):
 
 class InitialGoogleSignInView(APIView):
     def get(self, request: Request) -> Response:
+        if (
+            not application_config.GOOGLE_CLIENT_ID
+            or not application_config.GOOGLE_CLIENT_SECRET
+            or not application_config.GOOGLE_REDIRECT_URI
+        ):
+            raise APIException(detail={"message": "service unavailable"})
         base_url = "https://accounts.google.com/o/oauth2/v2/auth"
         query_params = urlencode(
             {
@@ -46,6 +53,12 @@ class InitialGoogleSignInView(APIView):
 class GoogleAuthCallbackView(APIView):
     def get(self, request: Request) -> HttpResponseRedirect:
         try:
+            if (
+                not application_config.GOOGLE_CLIENT_ID
+                or not application_config.GOOGLE_CLIENT_SECRET
+                or not application_config.GOOGLE_REDIRECT_URI
+            ):
+                raise APIException(detail={"message": "service unavailable"})
             code = request.GET.get("code")
             token_response = requests.post(
                 "https://oauth2.googleapis.com/token",
