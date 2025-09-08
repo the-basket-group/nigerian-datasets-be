@@ -4,8 +4,8 @@ from typing import TypedDict
 from urllib.parse import urlencode
 from uuid import uuid4
 
-from django.http import HttpResponseRedirect
 import requests
+from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from rest_framework.request import Request
 from rest_framework.response import Response
