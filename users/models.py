@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+import jwt
+from core.config import application_config
 
 class User(AbstractUser):
     first_name = models.CharField(null=False)
@@ -11,3 +13,12 @@ class User(AbstractUser):
     avatar_url = models.URLField(null=True, blank=True)
 
     REQUIRED_FIELDS = ["email"]
+    
+    def create_access_token(self) -> str:
+        user_data = {
+            "id": self.pk,
+            "email": self.email,
+            "role": self.role
+        }
+        return jwt.encode(user_data, application_config.JWT_ACCESS_TOKEN_SECRET, "HS256")
+    
