@@ -1,5 +1,6 @@
 from django.urls import path
-from users.views import InitialGoogleSignInView, GoogleAuthCallbackView
+
+from users.views import GoogleAuthCallbackView, InitialGoogleSignInView
 
 app_name = 'users'
 

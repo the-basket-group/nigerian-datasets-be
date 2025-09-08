@@ -1,16 +1,17 @@
-from rest_framework.views import APIView
-from rest_framework.request import Request
-from rest_framework.response import Response
-from rest_framework import status
-from core.config import application_config
+import secrets
+from datetime import UTC, datetime
+from typing import TypedDict
 from urllib.parse import urlencode
 from uuid import uuid4
+
 import requests
-from typing import TypedDict
-from users.models import User
-from datetime import datetime, timezone
 from django.shortcuts import redirect
-import secrets
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from core.config import application_config
+from users.models import User
 
 
 class GoogleUserInfoResponse(TypedDict):
@@ -62,7 +63,7 @@ class GoogleAuthCallbackView(APIView):
             user_access_token = None
             try:
                 user = User.objects.get(email=user_profile["email"])
-                user.last_login = datetime.now(tz=timezone.utc)
+                user.last_login = datetime.now(tz=UTC)
                 user.save()
                 user_access_token = user.create_access_token()
 
@@ -79,6 +80,6 @@ class GoogleAuthCallbackView(APIView):
                 user_access_token = user.create_access_token()
 
             return redirect(f"{application_config.FRONTEND_URL}/auth/success?token={user_access_token}")
-        except:
+        except Exception:
             message = urlencode({"message": "An unexpected error occurred"})
             return redirect(f"{application_config.FRONTEND_URL}/auth/failure?{message}")
