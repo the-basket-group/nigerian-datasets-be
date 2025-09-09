@@ -5,15 +5,22 @@ from urllib.parse import urlencode
 from uuid import uuid4
 
 import requests
+from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, ValidationError
+from rest_framework.generics import CreateAPIView
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.config import application_config
 from users.models import User
+from users.serializers import (
+    LoginUserSerializer,
+    RegisterUserSerializer,
+    UserSerializer,
+)
 
 
 class GoogleUserInfoResponse(TypedDict):
@@ -94,7 +101,7 @@ class GoogleAuthCallbackView(APIView):
                     email=user_profile["email"],
                     first_name=user_profile["given_name"],
                     last_name=user_profile["family_name"],
-                    display_name=f"{user_profile['given_name']}-{secrets.token_urlsafe(8)}",
+                    username=f"{user_profile['given_name']}-{secrets.token_urlsafe(8)}",
                     status="active",
                     avatar_url=user_profile["picture"],
                     role="member",
@@ -107,3 +114,65 @@ class GoogleAuthCallbackView(APIView):
         except Exception:
             message = urlencode({"message": "An unexpected error occurred"})
             return redirect(f"{application_config.FRONTEND_URL}/auth/failure?{message}")
+
+
+class RegisterUserView(CreateAPIView):
+    serializer_class = RegisterUserSerializer
+
+    def create(self, request: Request) -> Response:
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        existing_users = User.objects.filter(
+            Q(email=serializer.validated_data["email"].lower())
+            | Q(username=serializer.validated_data["username"].lower())
+        )
+
+        if existing_users.count():
+            raise ValidationError(
+                detail={"message": "user with username or email already exists."}
+            )
+
+        user = User.objects.create_user(
+            username=serializer.validated_data["username"].lower(),
+            email=serializer.validated_data["email"].lower(),
+            password=serializer.validated_data["password"],
+            first_name=serializer.validated_data["first_name"].title(),
+            last_name=serializer.validated_data["last_name"].title(),
+            status="active",
+            avatar_url="",
+            role="member",
+        )
+        user_response = UserSerializer(instance=user).data
+        return Response(
+            data={"message": "successfully registered user", "user": user_response}
+        )
+
+
+class LoginUserView(APIView):
+    serializer_class = LoginUserSerializer
+
+    def post(self, request: Request) -> Response:
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        existing_user = User.objects.filter(
+            email=serializer.validated_data["email"]
+        ).first()
+
+        if not existing_user:
+            raise ValidationError(detail={"message": "Invalid credentials"})
+
+        if not existing_user.check_password(serializer.validated_data["password"]):
+            raise ValidationError(detail={"message": "Invalid credentials"})
+
+        access_token = existing_user.create_access_token()
+        user_response = UserSerializer(instance=existing_user).data
+
+        return Response(
+            data={
+                "message": "successfully registered user",
+                "user": user_response,
+                "access_token": access_token,
+            }
+        )
