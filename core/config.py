@@ -12,6 +12,7 @@ class Config:
     GOOGLE_AUTH_SCOPE: list[str]
     FRONTEND_URL: str | None
     JWT_ACCESS_TOKEN_SECRET: str | None
+    JWT_ENCRYPTION_METHOD: str | None
 
     def __init__(self) -> None:
         self.GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -26,6 +27,7 @@ class Config:
         self.JWT_ACCESS_TOKEN_SECRET = os.getenv(
             "JWT_ACCESS_TOKEN_SECRET", "jwt-secret-key"
         )
+        self.JWT_ENCRYPTION_METHOD = os.getenv("JWT_ENCRYPTION_METHOD", "HS256")
 
 
 application_config = Config()
