@@ -5,6 +5,7 @@ from users.views import (
     InitialGoogleSignInView,
     LoginUserView,
     RegisterUserView,
+    TestAuthView,
 )
 
 app_name = "users"
@@ -12,6 +13,7 @@ app_name = "users"
 urlpatterns = [
     path("register/", RegisterUserView.as_view(), name="register_user"),
     path("login/", LoginUserView.as_view(), name="login_user"),
+    path("test/", TestAuthView.as_view(), name="test_auth"),
     path(
         "initiate-google-signin/",
         InitialGoogleSignInView.as_view(),
