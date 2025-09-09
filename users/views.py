@@ -101,11 +101,7 @@ class GoogleAuthCallbackView(APIView):
                     email=user_profile["email"],
                     first_name=user_profile["given_name"],
                     last_name=user_profile["family_name"],
-<<<<<<< HEAD
                     username=f"{user_profile['given_name']}-{secrets.token_urlsafe(8)}",
-=======
-                    display_name=f"{user_profile['given_name']}-{secrets.token_urlsafe(8)}",
->>>>>>> 1f6d02be3c74e19df5be3fe3f6b809d4d7898a50
                     status="active",
                     avatar_url=user_profile["picture"],
                     role="member",
@@ -118,7 +114,6 @@ class GoogleAuthCallbackView(APIView):
         except Exception:
             message = urlencode({"message": "An unexpected error occurred"})
             return redirect(f"{application_config.FRONTEND_URL}/auth/failure?{message}")
-<<<<<<< HEAD
 
 
 class RegisterUserView(CreateAPIView):
@@ -181,5 +176,3 @@ class LoginUserView(APIView):
                 "access_token": access_token,
             }
         )
-=======
->>>>>>> 1f6d02be3c74e19df5be3fe3f6b809d4d7898a50

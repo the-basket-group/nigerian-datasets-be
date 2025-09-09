@@ -27,10 +27,7 @@ class Config:
         self.JWT_ACCESS_TOKEN_SECRET = os.getenv(
             "JWT_ACCESS_TOKEN_SECRET", "jwt-secret-key"
         )
-<<<<<<< HEAD
         self.JWT_ENCRYPTION_METHOD = os.getenv("JWT_ENCRYPTION_METHOD", "HS256")
-=======
->>>>>>> 1f6d02be3c74e19df5be3fe3f6b809d4d7898a50
 
 
 application_config = Config()
