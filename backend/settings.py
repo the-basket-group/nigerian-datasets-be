@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "django_filters",
     "drf_spectacular",
     "core",
+    "users",
 ]
 
 MIDDLEWARE = [
@@ -77,6 +78,7 @@ if os.environ.get("USE_POSTGRES") == "true":
         "PORT": os.environ.get("DB_PORT", "5432"),
     }
 
+AUTH_USER_MODEL = "users.User"
 
 AUTH_PASSWORD_VALIDATORS = [
     {
