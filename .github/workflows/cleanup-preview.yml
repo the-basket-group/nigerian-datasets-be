@@ -22,7 +22,7 @@ jobs:
         run: |
           SERVICE_NAME="ng-datasets-be-pr-${{ github.event.number }}"
 
-          # Checks if service exists before trying to delete
+          # Check if service exists before trying to delete
           if gcloud run services describe $SERVICE_NAME --region us-central1 >/dev/null 2>&1; then
             echo "🗑️ Deleting preview service: $SERVICE_NAME"
             gcloud run services delete $SERVICE_NAME --region us-central1 --quiet
