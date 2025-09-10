@@ -7,6 +7,67 @@ on:
     branches: [ main, develop ]
 
 jobs:
+  pr-validation:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+    - name: Check PR Title Format
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const title = context.payload.pull_request.title;
+          const validPrefixes = ['feat:', 'fix:', 'docs:', 'style:', 'refactor:', 'test:', 'chore:', 'ci:', 'perf:', 'build:'];
+
+          const isValidFormat = validPrefixes.some(prefix => title.toLowerCase().startsWith(prefix));
+
+          if (!isValidFormat) {
+            const message = `❌ **Invalid PR title format**
+
+            Your PR title: "${title}"
+
+            Please use one of these conventional commit prefixes:
+            - \`feat:\` - A new feature
+            - \`fix:\` - A bug fix
+            - \`docs:\` - Documentation only changes
+            - \`style:\` - Changes that do not affect the meaning of the code
+            - \`refactor:\` - A code change that neither fixes a bug nor adds a feature
+            - \`test:\` - Adding missing tests or correcting existing tests
+            - \`chore:\` - Other changes that don't modify src or test files
+            - \`ci:\` - Changes to CI configuration files and scripts
+            - \`perf:\` - A code change that improves performance
+            - \`build:\` - Changes that affect the build system or dependencies
+
+            Example: \`feat: add user authentication\``;
+
+            core.setFailed(message);
+          }
+
+    - name: Check PR Description
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const body = context.payload.pull_request.body;
+
+          if (!body || body.trim().length === 0) {
+            const message = `❌ **PR description is required**
+
+            Please add a description to your pull request explaining:
+            - What changes you made
+            - Why you made them
+            - How to test the changes (if applicable)`;
+
+            core.setFailed(message);
+          }
+
+          if (body && body.trim().length < 10) {
+            const message = `❌ **PR description too short**
+
+            Please provide a more detailed description (at least 10 characters) explaining your changes.`;
+
+            core.setFailed(message);
+          }
+
   test:
     runs-on: ubuntu-latest
 

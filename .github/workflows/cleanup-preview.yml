@@ -1,0 +1,45 @@
+name: Cleanup Preview
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Delete Preview Service
+        run: |
+          SERVICE_NAME="ng-datasets-be-pr-${{ github.event.number }}"
+
+          # Check if service exists before trying to delete
+          if gcloud run services describe $SERVICE_NAME --region us-central1 >/dev/null 2>&1; then
+            echo "🗑️ Deleting preview service: $SERVICE_NAME"
+            gcloud run services delete $SERVICE_NAME --region us-central1 --quiet
+            echo "✅ Preview service deleted successfully"
+          else
+            echo "ℹ️ Service $SERVICE_NAME not found, nothing to cleanup"
+          fi
+
+      - name: Comment on PR about cleanup
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `🧹 **Preview cleanup completed**
+
+              The preview deployment \`ng-datasets-be-pr-${{ github.event.number }}\` has been deleted.`
+            });
