@@ -24,10 +24,34 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Build Docker image
-        run: docker build -t ng-datasets-be:latest .
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
 
-      - name: Deploy
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker to use gcloud
+        run: gcloud auth configure-docker
+
+      - name: Deploy to Cloud Run
         run: |
-          echo "Add deployment commands here"
-          echo "e.g., push to registry, deploy to server, etc."
+          gcloud run deploy ng-datasets-be \
+            --source . \
+            --platform managed \
+            --region us-central1 \
+            --allow-unauthenticated \
+            --set-env-vars DEBUG=false \
+            --memory 512Mi \
+            --cpu 1 \
+            --max-instances 10
+
+          # Get the service URL and extract hostname
+          SERVICE_URL=$(gcloud run services describe ng-datasets-be --region us-central1 --format 'value(status.url)')
+          SERVICE_HOST=$(echo $SERVICE_URL | sed 's|https://||' | sed 's|http://||')
+
+          # Update the service with the correct ALLOWED_HOSTS
+          gcloud run services update ng-datasets-be \
+            --region us-central1 \
+            --set-env-vars DEBUG=false,ALLOWED_HOSTS=$SERVICE_HOST
