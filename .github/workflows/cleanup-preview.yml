@@ -26,7 +26,7 @@ jobs:
           if gcloud run services describe $SERVICE_NAME --region us-central1 >/dev/null 2>&1; then
             echo "🗑️ Deleting preview service: $SERVICE_NAME"
             gcloud run services delete $SERVICE_NAME --region us-central1 --quiet
-            echo "✅ Preview service deleted successfully"
+            echo "✅ Preview service was deleted successfully"
           else
             echo "ℹ️ Service $SERVICE_NAME not found, nothing to cleanup"
           fi
