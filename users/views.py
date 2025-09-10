@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 
 from core.config import application_config
 from users.models import User
+from users.permissions import is_accessible
 from users.serializers import (
     LoginUserSerializer,
     RegisterUserSerializer,
@@ -176,3 +177,10 @@ class LoginUserView(APIView):
                 "access_token": access_token,
             }
         )
+
+
+class TestAuthView(APIView):
+    permission_classes = [is_accessible("admin")]
+
+    def get(self, request: Request) -> Response:
+        return Response(data={"success": True})
