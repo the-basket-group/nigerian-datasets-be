@@ -42,7 +42,16 @@ jobs:
             --platform managed \
             --region us-central1 \
             --allow-unauthenticated \
-            --set-env-vars DEBUG=false,ALLOWED_HOSTS=*.run.app \
+            --set-env-vars DEBUG=false \
             --memory 512Mi \
             --cpu 1 \
             --max-instances 10
+
+          # Get the service URL and extract hostname
+          SERVICE_URL=$(gcloud run services describe ng-datasets-be --region us-central1 --format 'value(status.url)')
+          SERVICE_HOST=$(echo $SERVICE_URL | sed 's|https://||' | sed 's|http://||')
+
+          # Update the service with the correct ALLOWED_HOSTS
+          gcloud run services update ng-datasets-be \
+            --region us-central1 \
+            --set-env-vars DEBUG=false,ALLOWED_HOSTS=$SERVICE_HOST

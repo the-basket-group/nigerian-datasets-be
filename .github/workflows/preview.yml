@@ -46,14 +46,21 @@ jobs:
             --platform managed \
             --region us-central1 \
             --allow-unauthenticated \
-            --set-env-vars DEBUG=true,ALLOWED_HOSTS=*.run.app \
+            --set-env-vars DEBUG=true \
             --memory 512Mi \
             --cpu 1 \
             --max-instances 5 \
             --tag pr-${{ github.event.number }}
 
-          # Get the service URL
+          # Get the service URL and extract hostname
           SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format 'value(status.url)')
+          SERVICE_HOST=$(echo $SERVICE_URL | sed 's|https://||' | sed 's|http://||')
+
+          # Update the service with the correct ALLOWED_HOSTS
+          gcloud run services update $SERVICE_NAME \
+            --region us-central1 \
+            --set-env-vars DEBUG=true,ALLOWED_HOSTS=$SERVICE_HOST
+
           echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
 
       - name: Comment PR with preview URL
