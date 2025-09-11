@@ -80,49 +80,59 @@ def compute_metadata(file: InMemoryUploadedFile) -> dict[str, Any] | None:
 
     column_schema: list[dict[str, Any]] = []
 
-    for col in df.columns:
-        col_data = df[col]
-        original_dtype = infer_dtype(col_data)
+    try:
+        for col in df.columns:
+            col_data = df[col]
+            original_dtype = infer_dtype(col_data)
 
-        # Get top 3 most frequent values
-        most_frequent = col_data.value_counts(normalize=True).head(3) * 100
-        top3_list = [
-            {"value": str(index), "frequency_percent": round(freq, 2)}
-            for index, freq in most_frequent.items()
-        ]
+            # Get top 3 most frequent values
+            most_frequent = col_data.value_counts(normalize=True).head(3) * 100
+            top3_list = [
+                {"value": str(index), "frequency_percent": round(freq, 2)}
+                for index, freq in most_frequent.items()
+            ]
 
-        # Handle numeric statistics
-        mean_val = None
-        median_val = None
-        if is_numeric_dtype(col_data):
-            try:
-                mean_val = (
-                    float(col_data.mean()) if not pd.isna(col_data.mean()) else None
-                )
-                median_val = (
-                    float(col_data.median()) if not pd.isna(col_data.median()) else None
-                )
-            except Exception:
-                mean_val = None
-                median_val = None
+            # Handle numeric statistics
+            mean_val = None
+            median_val = None
+            if is_numeric_dtype(col_data):
+                try:
+                    mean_val = (
+                        float(col_data.mean()) if not pd.isna(col_data.mean()) else None
+                    )
+                    median_val = (
+                        float(col_data.median())
+                        if not pd.isna(col_data.median())
+                        else None
+                    )
+                except Exception:
+                    mean_val = None
+                    median_val = None
 
-        # Handle mode (convert to serializable format)
-        mode_values = col_data.mode()
-        mode_list = [
-            str(val) for val in mode_values.tolist()[:3]
-        ]  # Limit to first 3 modes
+            # Handle mode (convert to serializable format)
+            mode_values = col_data.mode()
+            mode_list = [
+                str(val) for val in mode_values.tolist()[:3]
+            ]  # Limit to first 3 modes
 
-        schema: dict[str, Any] = {
-            "name": col,
-            "type": original_dtype,
-            "frequent_occurences": top3_list,
-            "missing_or_null_count": int(col_data.isna().sum()),
-            "unique_element_count": int(col_data.nunique()),
-            "mean": mean_val,
-            "median": median_val,
-            "mode": mode_list,
-        }
-        column_schema.append(schema)
+            schema: dict[str, Any] = {
+                "name": col,
+                "type": original_dtype,
+                "frequent_occurences": top3_list,
+                "missing_or_null_count": int(col_data.isna().sum()),
+                "unique_element_count": int(col_data.astype(str).nunique()),
+                "mean": mean_val,
+                "median": median_val,
+                "mode": mode_list,
+            }
+            column_schema.append(schema)
 
-    metadata["column_schema"] = column_schema
+        metadata["column_schema"] = column_schema
+    except Exception as e:
+        metadata["failure_reason"] = str(e)
+        metadata["meta_generation_failure"] = True
+        metadata["meta_generation_failure_timestamp"] = datetime.now().isoformat()
+    finally:
+        pass
+
     return metadata

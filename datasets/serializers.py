@@ -1,5 +1,9 @@
+import csv
+import json
+from io import StringIO
 from os import path
 
+import pandas as pd
 from django.core.files.base import File
 from rest_framework import serializers
 
@@ -11,10 +15,41 @@ class FileExtensionValidator:
         self.allowed_extensions = allowed_extensions
 
     def __call__(self, value: File) -> None:
-        # TODO: extra file validation
         if not value.name:
             raise serializers.ValidationError("File name cannot be empty")
         _, ext = path.splitext(value.name)
+        if ext == ".json":
+            try:
+                json.loads(value.read())
+            except Exception as e:
+                raise serializers.ValidationError(
+                    "invalid json file was uploaded"
+                ) from e
+
+        if ext == ".csv":
+            try:
+                csv.reader(StringIO(value.read().decode()))
+            except Exception as e:
+                raise serializers.ValidationError(
+                    "invalid csv file was uploaded"
+                ) from e
+
+        if ext == ".parquet":
+            try:
+                pd.read_parquet(value)
+            except Exception as e:
+                raise serializers.ValidationError(
+                    "invalid parquet file was uploaded"
+                ) from e
+
+        if ext == ".xlsx":
+            try:
+                pd.read_excel(value)
+            except Exception as e:
+                raise serializers.ValidationError(
+                    "invalid xlsx file was uploaded"
+                ) from e
+
         if ext not in self.allowed_extensions:
             raise serializers.ValidationError(
                 f"invalid file extension. allowed extensions are: {', '.join(self.allowed_extensions)}"
@@ -27,7 +62,9 @@ class CreateDatasetSerializer(serializers.ModelSerializer):
             allow_empty_file=False,
             allow_null=False,
             validators=[
-                FileExtensionValidator(allowed_extensions=[".csv", ".xlsx", ".json"])
+                FileExtensionValidator(
+                    allowed_extensions=[".csv", ".xlsx", ".json", ".parquet"]
+                )
             ],
         ),
         min_length=1,

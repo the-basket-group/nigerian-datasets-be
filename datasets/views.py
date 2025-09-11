@@ -66,6 +66,7 @@ class UploadDatasetView(CreateAPIView):
         # TODO: completeness score generation
 
         for file in request.FILES.getlist("files"):
+            file.seek(0)
             file_info = upload_datasetfile_to_gcloud(file)
             _, ext = os.path.splitext(file.name)
             ext = ext.replace(".", "")
@@ -85,8 +86,15 @@ class UploadDatasetView(CreateAPIView):
                     "file_info": metadata.get("file_info"),
                     "structure": metadata.get("structure"),
                     "extraction_timestamp": metadata.get("extraction_timestamp"),
+                    "failure_reason": metadata.get("failure_reason"),
+                    "meta_generation_failure": metadata.get(
+                        "meta_generation_failure", False
+                    ),
+                    "meta_generation_failure_timestamp": metadata.get(
+                        "meta_generation_failure_timestamp"
+                    ),
                 },
-                column_schema=metadata.get("column_schema"),
+                column_schema=metadata.get("column_schema", []),
             )
 
         response_data = DatasetSerializer(instance=dataset)
