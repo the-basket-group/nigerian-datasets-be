@@ -46,20 +46,6 @@ class Config:
             "JWT_ACCESS_TOKEN_SECRET", "jwt-secret-key"
         )
         self.JWT_ENCRYPTION_METHOD = os.getenv("JWT_ENCRYPTION_METHOD", "HS256")
-        # self.GOOGLE_SERVICE_ACCOUNT_INFO = {
-        #     "type": os.getenv("GOOGLE_SERVICE_TYPE"),
-        #     "project_id": os.getenv("GOOGLE_SERVICE_PROJECT_ID"),
-        #     "private_key_id": os.getenv("GOOGLE_SERVICE_PRIVATE_KEY_ID"),
-        #     "private_key": os.getenv("GOOGLE_SERVICE_PRIVATE_KEY"),
-        #     "client_email": os.getenv("GOOGLE_SERVICE_CLIENT_EMAIL"),
-        #     "client_id": os.getenv("GOOGLE_SERVICE_CLIENT_ID"),
-        #     "auth_uri": os.getenv("GOOGLE_SERVICE_AUTH_URI"),
-        #     "token_uri": os.getenv("GOOGLE_SERVICE_TOKEN_URI"),
-        #     "auth_provider_x509_cert_url": os.getenv("GOOGLE_SERVICE_AUTH_PROVIDER_x509_URL"),
-        #     "client_x509_cert_url": os.getenv("GOOGLE_SERVICE_CLIENT_x509_CERT_URL"),
-        #     "universe_domain": os.getenv("GOOGLE_SERVICE_UNIVERSE_DOMAIN")
-        # }
-
         self.GOOGLE_SERVICE_ACCOUNT_INFO = json.loads(
             os.getenv("GCP_SERVICE_ACCOUNT_KEY", "{}")
         )
