@@ -1,8 +1,10 @@
+import csv
 import os
 from datetime import datetime
 from typing import Any, TypedDict
 
 import pandas as pd
+from charset_normalizer import from_bytes
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from google.cloud import storage
 from google.oauth2 import service_account
@@ -33,6 +35,7 @@ def upload_datasetfile_to_gcloud(file: InMemoryUploadedFile) -> storage.Blob:
 
 
 def compute_metadata(file: InMemoryUploadedFile) -> dict[str, Any] | None:
+    delimiter = None
     df: pd.DataFrame | None = None
     file.seek(0)
     if not file.name:
@@ -58,29 +61,40 @@ def compute_metadata(file: InMemoryUploadedFile) -> dict[str, Any] | None:
     if df is None:
         return None
 
-    metadata: dict[str, Any] = {
-        "extraction_timestamp": datetime.now().isoformat(),
-        "file_info": {
-            # TODO: file_encoding
-            # TODO: csv_delimiter
-            # "csv_delimiter": delimiter,
-            "file_size": file.size,
-            # "encoding": str(file.)
-        },
-        "structure": {},
-        "statistical_summary": {},
-    }
-
-    metadata["structure"] = {
-        "rows": len(df),
-        "columns": len(df.columns),
-        "column_names": df.columns.tolist(),
-        "shape": df.shape,
-    }
-
-    column_schema: list[dict[str, Any]] = []
-
     try:
+        file.seek(0)
+        charset_match = from_bytes(file.read())
+        file_encoding: str | None = None
+        if charset_match:
+            best_file_encoding = charset_match.best()
+            if best_file_encoding:
+                file_encoding = best_file_encoding.encoding
+
+        if ext == "csv":
+            file.seek(0)
+            sample = file.read(4096)
+            dialect = csv.Sniffer().sniff(sample.decode(file_encoding))
+            delimiter = dialect.delimiter
+
+        metadata: dict[str, Any] = {
+            "extraction_timestamp": datetime.now().isoformat(),
+            "file_info": {
+                "csv_delimiter": delimiter,
+                "file_size": file.size,
+                "encoding": file_encoding,
+            },
+            "structure": {},
+            "statistical_summary": {},
+        }
+
+        metadata["structure"] = {
+            "rows": len(df),
+            "columns": len(df.columns),
+            "column_names": df.columns.tolist(),
+            "shape": df.shape,
+        }
+
+        column_schema: list[dict[str, Any]] = []
         for col in df.columns:
             col_data = df[col]
             original_dtype = infer_dtype(col_data)
