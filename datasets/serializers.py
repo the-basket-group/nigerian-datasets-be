@@ -1,5 +1,4 @@
 from os import path
-from typing import Any
 
 from django.core.files.base import File
 from rest_framework import serializers

@@ -9,7 +9,7 @@ from rest_framework.response import Response
 
 from datasets.models import Dataset, DatasetFile, DatasetVersion
 from datasets.serializers import CreateDatasetSerializer, DatasetSerializer
-from datasets.utils import FileMetadata, compute_metadata, upload_datasetfile_to_gcloud
+from datasets.utils import compute_metadata, upload_datasetfile_to_gcloud
 from users.models import User
 from users.permissions import is_accessible
 

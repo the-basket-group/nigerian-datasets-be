@@ -97,12 +97,10 @@ def compute_metadata(file: InMemoryUploadedFile) -> dict[str, Any] | None:
         if is_numeric_dtype(col_data):
             try:
                 mean_val = (
-                    float(col_data.mean()) if not pd.isna(
-                        col_data.mean()) else None
+                    float(col_data.mean()) if not pd.isna(col_data.mean()) else None
                 )
                 median_val = (
-                    float(col_data.median()) if not pd.isna(
-                        col_data.median()) else None
+                    float(col_data.median()) if not pd.isna(col_data.median()) else None
                 )
             except Exception:
                 mean_val = None
