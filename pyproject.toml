@@ -55,7 +55,7 @@ disallow_untyped_defs = true
 plugins = ["mypy_django_plugin.main"]
 
 [[tool.mypy.overrides]]
-module = "google.cloud.*"
+module = "google.*"
 ignore_missing_imports = true
 
 [tool.django-stubs]
