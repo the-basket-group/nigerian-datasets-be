@@ -1,8 +1,24 @@
+import json
 import os
+from typing import TypedDict
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+class GoogleServiceAccount(TypedDict):
+    type: str | None
+    project_id: str | None
+    private_key_id: str | None
+    private_key: str | None
+    client_email: str | None
+    client_id: str | None
+    auth_uri: str | None
+    token_uri: str | None
+    auth_provider_x509_cert_url: str | None
+    client_x509_cert_url: str | None
+    universe_domain: str | None
 
 
 class Config:
@@ -13,6 +29,8 @@ class Config:
     FRONTEND_URL: str | None
     JWT_ACCESS_TOKEN_SECRET: str | None
     JWT_ENCRYPTION_METHOD: str | None
+    GOOGLE_SERVICE_ACCOUNT_INFO = GoogleServiceAccount | None
+    BUCKET_NAME: str | None
 
     def __init__(self) -> None:
         self.GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -28,6 +46,10 @@ class Config:
             "JWT_ACCESS_TOKEN_SECRET", "jwt-secret-key"
         )
         self.JWT_ENCRYPTION_METHOD = os.getenv("JWT_ENCRYPTION_METHOD", "HS256")
+        self.GOOGLE_SERVICE_ACCOUNT_INFO = json.loads(
+            os.getenv("GCP_SERVICE_ACCOUNT_KEY", "{}")
+        )
+        self.BUCKET_NAME = os.getenv("BUCKET_NAME")
 
 
 application_config = Config()
