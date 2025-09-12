@@ -53,27 +53,30 @@ jobs:
           GOOGLE_AUTH_SCOPE: ${{ vars.GOOGLE_AUTH_SCOPE }}
           BUCKET_NAME: ${{ vars.BUCKET_NAME }}
         run: |
-          # Build environment variables dynamically from all environment variables
-          ENV_VARS=""
-          for var in DEBUG SECRET_KEY USE_POSTGRES DB_NAME DB_USER DB_PASSWORD DB_HOST DB_PORT CORS_ALLOWED_ORIGINS GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI GOOGLE_AUTH_SCOPE BUCKET_NAME; do
-            value=$(eval echo \$$var)
-            if [ -n "$value" ]; then
-              # Remove spaces from comma-separated values
-              value=$(echo "$value" | sed 's/, /,/g')
-              if [ -z "$ENV_VARS" ]; then
-                ENV_VARS="$var=$value"
-              else
-                ENV_VARS="$ENV_VARS,$var=$value"
-              fi
-            fi
-          done
+          # Create environment variables file
+          cat > .env.deploy << EOF
+          DEBUG=$DEBUG
+          SECRET_KEY=$SECRET_KEY
+          USE_POSTGRES=$USE_POSTGRES
+          DB_NAME=$DB_NAME
+          DB_USER=$DB_USER
+          DB_PASSWORD=$DB_PASSWORD
+          DB_HOST=$DB_HOST
+          DB_PORT=$DB_PORT
+          CORS_ALLOWED_ORIGINS=$CORS_ALLOWED_ORIGINS
+          GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+          GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
+          GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI
+          GOOGLE_AUTH_SCOPE=$GOOGLE_AUTH_SCOPE
+          BUCKET_NAME=$BUCKET_NAME
+          EOF
 
           gcloud run deploy ng-datasets-be \
             --source . \
             --platform managed \
             --region us-central1 \
             --allow-unauthenticated \
-            --set-env-vars "$ENV_VARS" \
+            --env-vars-file .env.deploy \
             --memory 512Mi \
             --cpu 1 \
             --max-instances 10
@@ -85,4 +88,7 @@ jobs:
           # Update the service with the correct ALLOWED_HOSTS
           gcloud run services update ng-datasets-be \
             --region us-central1 \
-            --set-env-vars "$ENV_VARS,ALLOWED_HOSTS=$SERVICE_HOST"
+            --set-env-vars "ALLOWED_HOSTS=$SERVICE_HOST"
+
+          # Clean up
+          rm -f .env.deploy
