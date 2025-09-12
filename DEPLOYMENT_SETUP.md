@@ -13,6 +13,7 @@ To use the automated deployment with environment variables, you need to set up G
 ## Environment Variables for Both Environments
 
 ### Variables (non-sensitive, visible)
+
 - `DEBUG` → `false` (production) / `true` (dev)
 - `USE_POSTGRES` → `true` or `false`
 - `DB_NAME` → your database name
@@ -25,6 +26,7 @@ To use the automated deployment with environment variables, you need to set up G
 - `BUCKET_NAME` → your Google Cloud Storage bucket name
 
 ### Secrets (sensitive, encrypted)
+
 - `SECRET_KEY` → your Django secret key
 - `DB_PASSWORD` → your database password
 - `GOOGLE_CLIENT_ID` → your Google OAuth client ID
@@ -34,18 +36,20 @@ To use the automated deployment with environment variables, you need to set up G
 ## Environment Differences
 
 **Production Environment:**
+
 - Used by main branch deployments
 - `DEBUG=false`
 - Production database credentials
 
 **Dev Environment:**
+
 - Used by PR preview deployments
 - `DEBUG=true`
 - Development/staging database credentials
 
 ## Adding New Environment Variables
 
-When you add new environment variables to your project:
+When you add the environment variables to your project:
 
 1. Add them to the `env:` section in `.github/workflows/deploy.yml`
 2. Add the variable name to the `for var in ...` loop
