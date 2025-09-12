@@ -56,22 +56,22 @@ jobs:
           GOOGLE_AUTH_SCOPE: ${{ vars.GOOGLE_AUTH_SCOPE }}
           BUCKET_NAME: ${{ vars.BUCKET_NAME }}
         run: |
-          # Create environment variables file
-          cat > .env.deploy << EOF
-          DEBUG=$DEBUG
-          SECRET_KEY=$SECRET_KEY
-          USE_POSTGRES=$USE_POSTGRES
-          DB_NAME=$DB_NAME
-          DB_USER=$DB_USER
-          DB_PASSWORD=$DB_PASSWORD
-          DB_HOST=$DB_HOST
-          DB_PORT=$DB_PORT
-          CORS_ALLOWED_ORIGINS=$CORS_ALLOWED_ORIGINS
-          GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
-          GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
-          GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI
-          GOOGLE_AUTH_SCOPE=$GOOGLE_AUTH_SCOPE
-          BUCKET_NAME=$BUCKET_NAME
+          # Create environment variables file in YAML format
+          cat > .env.deploy.yaml << EOF
+          DEBUG: "$DEBUG"
+          SECRET_KEY: "$SECRET_KEY"
+          USE_POSTGRES: "$USE_POSTGRES"
+          DB_NAME: "$DB_NAME"
+          DB_USER: "$DB_USER"
+          DB_PASSWORD: "$DB_PASSWORD"
+          DB_HOST: "$DB_HOST"
+          DB_PORT: "$DB_PORT"
+          CORS_ALLOWED_ORIGINS: "$CORS_ALLOWED_ORIGINS"
+          GOOGLE_CLIENT_ID: "$GOOGLE_CLIENT_ID"
+          GOOGLE_CLIENT_SECRET: "$GOOGLE_CLIENT_SECRET"
+          GOOGLE_REDIRECT_URI: "$GOOGLE_REDIRECT_URI"
+          GOOGLE_AUTH_SCOPE: "$GOOGLE_AUTH_SCOPE"
+          BUCKET_NAME: "$BUCKET_NAME"
           EOF
 
           SERVICE_NAME="ng-datasets-be-pr-${{ github.event.number }}"
@@ -80,7 +80,7 @@ jobs:
             --platform managed \
             --region us-central1 \
             --allow-unauthenticated \
-            --env-vars-file .env.deploy \
+            --env-vars-file .env.deploy.yaml \
             --memory 512Mi \
             --cpu 1 \
             --max-instances 5 \
@@ -96,7 +96,7 @@ jobs:
             --set-env-vars "ALLOWED_HOSTS=$SERVICE_HOST"
 
           # Clean up
-          rm -f .env.deploy
+          rm -f .env.deploy.yaml
 
           echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
 
