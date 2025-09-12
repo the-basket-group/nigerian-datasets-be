@@ -61,6 +61,8 @@ jobs:
           for var in DEBUG SECRET_KEY USE_POSTGRES DB_NAME DB_USER DB_PASSWORD DB_HOST DB_PORT CORS_ALLOWED_ORIGINS GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI GOOGLE_AUTH_SCOPE BUCKET_NAME; do
             value=$(eval echo \$$var)
             if [ -n "$value" ]; then
+              # Remove spaces from comma-separated values
+              value=$(echo "$value" | sed 's/, /,/g')
               if [ -z "$ENV_VARS" ]; then
                 ENV_VARS="$var=$value"
               else
