@@ -198,5 +198,5 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            // This ensures the PR service gets deleted when PR is closed/merged
+            // This ensures that the PR service gets deleted when PR is closed/merged
             console.log('PR service created. It will be automatically deleted when the PR is closed or merged.');
