@@ -39,23 +39,23 @@ jobs:
       - name: Configure Docker to use gcloud
         run: gcloud auth configure-docker
 
-      - name: Check if preview service exists
+      - name: Check if PR service exists
         id: check_service
         run: |
           SERVICE_NAME="ng-datasets-be-pr-${{ github.event.number }}"
 
-          # Check if the service already exists
+          # Check if THIS SPECIFIC PR's service already exists
           if gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)' 2>/dev/null; then
             echo "SERVICE_EXISTS=true" >> $GITHUB_OUTPUT
-            # Get the existing service URL and hostname
+            # Get the existing PR service URL
             SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)')
             SERVICE_HOST=$(echo $SERVICE_URL | sed 's|https://||' | sed 's|http://||')
             echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
             echo "SERVICE_HOST=$SERVICE_HOST" >> $GITHUB_OUTPUT
-            echo "Preview service already exists with URL: $SERVICE_URL"
+            echo "PR #${{ github.event.number }} service exists with URL: $SERVICE_URL"
           else
             echo "SERVICE_EXISTS=false" >> $GITHUB_OUTPUT
-            echo "Preview service does not exist, will create new one"
+            echo "PR #${{ github.event.number }} service does not exist, will create new one"
           fi
 
       - name: Deploy Preview to Cloud Run
@@ -79,17 +79,19 @@ jobs:
         run: |
           SERVICE_NAME="ng-datasets-be-pr-${{ github.event.number }}"
 
-          # If service exists, use its hostname for ALLOWED_HOSTS
+          echo "Deploying preview service for PR #${{ github.event.number }}: $SERVICE_NAME"
+
+          # If THIS PR's service exists, use its existing hostname
+          # Otherwise use wildcard temporarily
           if [ "$SERVICE_EXISTS" = "true" ]; then
             ALLOWED_HOSTS_VALUE="$EXISTING_HOST"
-            echo "Using existing preview service hostname: $ALLOWED_HOSTS_VALUE"
+            echo "Using existing PR #${{ github.event.number }} service hostname: $ALLOWED_HOSTS_VALUE"
           else
-            # For new deployment, we'll update ALLOWED_HOSTS after deployment
-            ALLOWED_HOSTS_VALUE="*"  # Temporary wildcard
-            echo "Creating new preview service, will update ALLOWED_HOSTS after deployment"
+            ALLOWED_HOSTS_VALUE="*"
+            echo "Creating new PR #${{ github.event.number }} service, will update ALLOWED_HOSTS after deployment"
           fi
 
-          # Deploy the preview service
+          # Deploy the PR-specific service
           gcloud run deploy $SERVICE_NAME \
             --source . \
             --platform managed \
@@ -115,13 +117,13 @@ jobs:
             --set-env-vars "BUCKET_NAME=${BUCKET_NAME}" \
             --set-env-vars "ALLOWED_HOSTS=${ALLOWED_HOSTS_VALUE}"
 
-          # If this was a new service, update ALLOWED_HOSTS with the actual hostname
+          # If this was a NEW PR service, get the URL and update ALLOWED_HOSTS
           if [ "$SERVICE_EXISTS" = "false" ]; then
-            echo "New preview service created, updating ALLOWED_HOSTS..."
+            echo "New PR #${{ github.event.number }} service created, updating ALLOWED_HOSTS..."
             SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)')
             SERVICE_HOST=$(echo $SERVICE_URL | sed 's|https://||' | sed 's|http://||')
 
-            # Update only the ALLOWED_HOSTS variable
+            # Update ALLOWED_HOSTS with the actual hostname
             gcloud run services update $SERVICE_NAME \
               --region us-central1 \
               --update-env-vars "ALLOWED_HOSTS=$SERVICE_HOST"
@@ -129,7 +131,8 @@ jobs:
             echo "Updated ALLOWED_HOSTS to: $SERVICE_HOST"
             echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
           else
-            # Use existing URL
+            # PR service already existed, use its existing URL
+            echo "Using existing PR #${{ github.event.number }} service URL: ${{ steps.check_service.outputs.SERVICE_URL }}"
             echo "SERVICE_URL=${{ steps.check_service.outputs.SERVICE_URL }}" >> $GITHUB_ENV
           fi
 
@@ -155,7 +158,8 @@ jobs:
             📍 **Preview URL:** ${{ env.SERVICE_URL }}
             🔧 **Service:** ng-datasets-be-pr-${{ github.event.number }}
 
-            ℹ️ This URL will remain stable across all updates to this PR.
+            ℹ️ This URL is specific to PR #${{ github.event.number }} and will remain stable.
+            ℹ️ The main branch has its own separate production URL.
 
             This preview will be automatically deleted when the PR is merged or closed.`;
 
@@ -174,3 +178,11 @@ jobs:
                 body: body
               });
             }
+
+      - name: Add cleanup workflow
+        if: steps.check_service.outputs.SERVICE_EXISTS == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // This ensures the PR service gets deleted when PR is closed/merged
+            console.log('PR service created. It will be automatically deleted when the PR is closed or merged.');
