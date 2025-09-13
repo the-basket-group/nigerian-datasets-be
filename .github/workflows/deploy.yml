@@ -36,6 +36,23 @@ jobs:
       - name: Configure Docker to use gcloud
         run: gcloud auth configure-docker
 
+      - name: Check if service exists and get URL
+        id: check_service
+        run: |
+          # Check if the service already exists
+          if gcloud run services describe ng-datasets-be --region us-central1 --format='value(status.url)' 2>/dev/null; then
+            echo "SERVICE_EXISTS=true" >> $GITHUB_OUTPUT
+            # Get the existing service URL and hostname
+            SERVICE_URL=$(gcloud run services describe ng-datasets-be --region us-central1 --format='value(status.url)')
+            SERVICE_HOST=$(echo $SERVICE_URL | sed 's|https://||' | sed 's|http://||')
+            echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
+            echo "SERVICE_HOST=$SERVICE_HOST" >> $GITHUB_OUTPUT
+            echo "Service already exists with URL: $SERVICE_URL"
+          else
+            echo "SERVICE_EXISTS=false" >> $GITHUB_OUTPUT
+            echo "Service does not exist, will create new one"
+          fi
+
       - name: Deploy to Cloud Run
         env:
           DEBUG: ${{ vars.DEBUG }}
@@ -52,8 +69,20 @@ jobs:
           GOOGLE_REDIRECT_URI: ${{ vars.GOOGLE_REDIRECT_URI }}
           GOOGLE_AUTH_SCOPE: ${{ vars.GOOGLE_AUTH_SCOPE }}
           BUCKET_NAME: ${{ vars.BUCKET_NAME }}
+          SERVICE_EXISTS: ${{ steps.check_service.outputs.SERVICE_EXISTS }}
+          EXISTING_HOST: ${{ steps.check_service.outputs.SERVICE_HOST }}
         run: |
-          # Deploy with environment variables (properly escaped)
+          # If service exists, get its hostname for ALLOWED_HOSTS
+          if [ "$SERVICE_EXISTS" = "true" ]; then
+            ALLOWED_HOSTS_VALUE="$EXISTING_HOST"
+            echo "Using existing service hostname: $ALLOWED_HOSTS_VALUE"
+          else
+            # For new deployment, we'll update ALLOWED_HOSTS after deployment
+            ALLOWED_HOSTS_VALUE="*"  # Temporary wildcard
+            echo "Creating new service, will update ALLOWED_HOSTS after deployment"
+          fi
+
+          # Deploy the service
           gcloud run deploy ng-datasets-be \
             --source . \
             --platform managed \
@@ -75,13 +104,28 @@ jobs:
             --set-env-vars "GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}" \
             --set-env-vars "^@^GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}" \
             --set-env-vars "^@^GOOGLE_AUTH_SCOPE=${GOOGLE_AUTH_SCOPE}" \
-            --set-env-vars "BUCKET_NAME=${BUCKET_NAME}"
+            --set-env-vars "BUCKET_NAME=${BUCKET_NAME}" \
+            --set-env-vars "ALLOWED_HOSTS=${ALLOWED_HOSTS_VALUE}"
 
-          # Get the service URL and extract hostname
-          SERVICE_URL=$(gcloud run services describe ng-datasets-be --region us-central1 --format 'value(status.url)')
-          SERVICE_HOST=$(echo $SERVICE_URL | sed 's|https://||' | sed 's|http://||')
+          # If this was a new service, update ALLOWED_HOSTS with the actual hostname
+          if [ "$SERVICE_EXISTS" = "false" ]; then
+            echo "New service created, updating ALLOWED_HOSTS..."
+            SERVICE_URL=$(gcloud run services describe ng-datasets-be --region us-central1 --format='value(status.url)')
+            SERVICE_HOST=$(echo $SERVICE_URL | sed 's|https://||' | sed 's|http://||')
 
-          # Update the service with the correct ALLOWED_HOSTS
-          gcloud run services update ng-datasets-be \
-            --region us-central1 \
-            --update-env-vars "ALLOWED_HOSTS=$SERVICE_HOST"
+            # Update only the ALLOWED_HOSTS variable
+            gcloud run services update ng-datasets-be \
+              --region us-central1 \
+              --update-env-vars "ALLOWED_HOSTS=$SERVICE_HOST"
+
+            echo "Updated ALLOWED_HOSTS to: $SERVICE_HOST"
+            echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
+          else
+            echo "SERVICE_URL=${{ steps.check_service.outputs.SERVICE_URL }}" >> $GITHUB_ENV
+          fi
+
+      - name: Display service URL
+        run: |
+          echo "🚀 Service deployed successfully!"
+          echo "📍 URL: ${{ env.SERVICE_URL }}"
+          echo "This URL will remain stable across deployments."
