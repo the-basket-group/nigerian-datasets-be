@@ -46,7 +46,7 @@ jobs:
             echo "SERVICE_EXISTS=true" >> $GITHUB_OUTPUT
             # Get the existing MAIN service URL
             SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)')
-            SERVICE_HOST=$(echo $SERVICE_URL | sed 's|https://||' | sed 's|http://||')
+            SERVICE_HOST=$(echo $SERVICE_URL | sed 's|^https://||' | sed 's|^http://||' | sed 's|/$||')
             echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
             echo "SERVICE_HOST=$SERVICE_HOST" >> $GITHUB_OUTPUT
             echo "Main service exists with URL: $SERVICE_URL"
@@ -89,8 +89,8 @@ jobs:
             echo "Creating new main service, will update ALLOWED_HOSTS after deployment"
           fi
 
-          # Deploy to Cloud Run
-          gcloud run deploy $SERVICE_NAME \
+          # Deploy to Cloud Run and capture the output
+          DEPLOY_OUTPUT=$(gcloud run deploy $SERVICE_NAME \
             --source . \
             --platform managed \
             --region us-central1 \
@@ -112,20 +112,33 @@ jobs:
             --set-env-vars "^@^GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}" \
             --set-env-vars "^@^GOOGLE_AUTH_SCOPE=${GOOGLE_AUTH_SCOPE}" \
             --set-env-vars "BUCKET_NAME=${BUCKET_NAME}" \
-            --set-env-vars "ALLOWED_HOSTS=${ALLOWED_HOSTS_VALUE}"
+            --set-env-vars "ALLOWED_HOSTS=${ALLOWED_HOSTS_VALUE}" 2>&1)
 
-          # If this was a NEW service, get the URL and update ALLOWED_HOSTS
+          echo "$DEPLOY_OUTPUT"
+
+          # Extract the Service URL from the deployment output
+          SERVICE_URL=$(echo "$DEPLOY_OUTPUT" | grep "Service URL:" | sed 's/Service URL: //')
+
+          # If we didn't get it from output, try describe command
+          if [ -z "$SERVICE_URL" ]; then
+            SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)')
+          fi
+
+          # Extract hostname
+          SERVICE_HOST=$(echo $SERVICE_URL | sed 's|^https://||' | sed 's|^http://||' | sed 's|/$||')
+
+          # If this was a NEW service, update ALLOWED_HOSTS with correct hostname
           if [ "$SERVICE_EXISTS" = "false" ]; then
             echo "New main service created, updating ALLOWED_HOSTS..."
-            SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)')
-            SERVICE_HOST=$(echo $SERVICE_URL | sed 's|https://||' | sed 's|http://||')
+            echo "Full Service URL: $SERVICE_URL"
+            echo "Extracted hostname for ALLOWED_HOSTS: $SERVICE_HOST"
 
             # Update ALLOWED_HOSTS with the actual hostname
             gcloud run services update $SERVICE_NAME \
               --region us-central1 \
               --update-env-vars "ALLOWED_HOSTS=$SERVICE_HOST"
 
-            echo "Updated ALLOWED_HOSTS to: $SERVICE_HOST"
+            echo "✅ Successfully updated ALLOWED_HOSTS to: $SERVICE_HOST"
             echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
           else
             # Service already existed, use its existing URL

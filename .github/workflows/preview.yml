@@ -49,7 +49,7 @@ jobs:
             echo "SERVICE_EXISTS=true" >> $GITHUB_OUTPUT
             # Get the existing PR service URL
             SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)')
-            SERVICE_HOST=$(echo $SERVICE_URL | sed 's|https://||' | sed 's|http://||')
+            SERVICE_HOST=$(echo $SERVICE_URL | sed 's|^https://||' | sed 's|^http://||' | sed 's|/$||')
             echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
             echo "SERVICE_HOST=$SERVICE_HOST" >> $GITHUB_OUTPUT
             echo "PR #${{ github.event.number }} service exists with URL: $SERVICE_URL"
@@ -91,8 +91,8 @@ jobs:
             echo "Creating new PR #${{ github.event.number }} service, will update ALLOWED_HOSTS after deployment"
           fi
 
-          # Deploy the PR-specific service
-          gcloud run deploy $SERVICE_NAME \
+          # Deploy the PR-specific service and capture output
+          DEPLOY_OUTPUT=$(gcloud run deploy $SERVICE_NAME \
             --source . \
             --platform managed \
             --region us-central1 \
@@ -115,20 +115,34 @@ jobs:
             --set-env-vars "^@^GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}" \
             --set-env-vars "^@^GOOGLE_AUTH_SCOPE=${GOOGLE_AUTH_SCOPE}" \
             --set-env-vars "BUCKET_NAME=${BUCKET_NAME}" \
-            --set-env-vars "ALLOWED_HOSTS=${ALLOWED_HOSTS_VALUE}"
+            --set-env-vars "ALLOWED_HOSTS=${ALLOWED_HOSTS_VALUE}" 2>&1)
 
-          # If this was a NEW PR service, get the URL and update ALLOWED_HOSTS
-          if [ "$SERVICE_EXISTS" = "false" ]; then
-            echo "New PR #${{ github.event.number }} service created, updating ALLOWED_HOSTS..."
+          echo "$DEPLOY_OUTPUT"
+
+          # Extract the Service URL from the deployment output (this is the correct one)
+          SERVICE_URL=$(echo "$DEPLOY_OUTPUT" | grep "Service URL:" | sed 's/Service URL: //')
+
+          # If we didn't get it from output, try describe command
+          if [ -z "$SERVICE_URL" ]; then
             SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)')
-            SERVICE_HOST=$(echo $SERVICE_URL | sed 's|https://||' | sed 's|http://||')
+          fi
 
-            # Update ALLOWED_HOSTS with the actual hostname
+          # Extract hostname from the URL
+          SERVICE_HOST=$(echo $SERVICE_URL | sed 's|^https://||' | sed 's|^http://||' | sed 's|/$||')
+
+          # If this was a NEW PR service, update ALLOWED_HOSTS with correct hostname
+          if [ "$SERVICE_EXISTS" = "false" ]; then
+            echo ""
+            echo "New PR #${{ github.event.number }} service created, updating ALLOWED_HOSTS..."
+            echo "Full Service URL: $SERVICE_URL"
+            echo "Extracted hostname for ALLOWED_HOSTS: $SERVICE_HOST"
+
+            # Update ALLOWED_HOSTS with the actual hostname from deployment output
             gcloud run services update $SERVICE_NAME \
               --region us-central1 \
               --update-env-vars "ALLOWED_HOSTS=$SERVICE_HOST"
 
-            echo "Updated ALLOWED_HOSTS to: $SERVICE_HOST"
+            echo "✅ Successfully updated ALLOWED_HOSTS to: $SERVICE_HOST"
             echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
           else
             # PR service already existed, use its existing URL
