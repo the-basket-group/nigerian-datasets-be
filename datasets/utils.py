@@ -150,3 +150,30 @@ def compute_metadata(file: InMemoryUploadedFile) -> dict[str, Any] | None:
         pass
 
     return metadata
+
+# File size validation
+MAX_FILE_SIZE = 200 * 1024 * 1024
+
+def validate_file_size(file: InMemoryUploadedFile) -> None:
+    if file.size > MAX_FILE_SIZE:
+        raise ValueError(
+            f"File size {file.size/1024/1024:.2f} MB exceeds the 200MB limit."
+        )
+    
+# Completeness score
+def compute_completeness(dataset) -> int:
+    required_fields = [
+        dataset.title,
+        dataset.description,
+        dataset.license,
+        dataset.source_org,
+        dataset.geography,
+        dataset.update_frequency,
+    ]
+    required_fields.append(dataset.tags.exists())
+
+    filled = sum(bool(field) for field in required_fields)
+    total = len(required_fields)
+
+    score = int((filled / total) * 100) if total > 0 else 0
+    return score
