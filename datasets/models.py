@@ -8,7 +8,7 @@ class Dataset(models.Model):
         primary_key=True, default=uuid.uuid4, unique=True, editable=False
     )
     title = models.CharField(null=False, max_length=100)
-    description = models.TextField(blank=True, default="")
+    description = models.TextField(null=False)
     license = models.CharField(blank=True, max_length=30, default="")
     source_org = models.CharField(blank=True, max_length=30, default="")
     geography = models.CharField(default="Nigeria", max_length=30)
