@@ -7,11 +7,12 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from datasets.models import Dataset, DatasetFile, DatasetVersion
+from datasets.models import Dataset, DatasetFile, DatasetVersion, Tag
 from datasets.serializers import CreateDatasetSerializer, DatasetSerializer
 from datasets.utils import compute_metadata, upload_datasetfile_to_gcloud
 from users.models import User
 from users.permissions import is_accessible
+from datasets.utils import compute_completeness
 
 PageNumberPagination.page_size = 20
 
@@ -37,7 +38,7 @@ class UploadDatasetView(CreateAPIView):
             and serializer.validated_data["status"] == "published"
             else None
         )
-        # TODO: compute completeness score
+       
         dataset = Dataset.objects.create(
             title=serializer.validated_data["title"],
             description=serializer.validated_data.get("description", ""),
@@ -47,13 +48,20 @@ class UploadDatasetView(CreateAPIView):
             update_frequency=serializer.validated_data.get("update_frequency", "never"),
             is_public=serializer.validated_data.get("is_public"),
             metadata=serializer.validated_data.get("metadata", {}),
-            # TODO: allow tags
-            # tags=serializer.validated_data.get('tags', []),
             status=serializer.validated_data.get("status", "draft"),
             owner=owner,
             is_approved=is_approved,
             approved_by=approved_by,
         )
+
+        # Dataset tags added
+        tags_data = serializer.validated_data.get("tags", [])
+        tag_list = []
+        for tag_name in tags_data:
+            tags, _ = Tag.objects.get_or_create(name=tag_name.strip().lower())
+            tag_list.append(tags)
+
+        dataset.tags.set(tag_list)
 
         dataset_version = DatasetVersion.objects.create(
             dataset=dataset,
@@ -62,8 +70,6 @@ class UploadDatasetView(CreateAPIView):
             changelog=[],
             owner=owner,
         )
-
-        # TODO: completeness score generation
 
         for file in request.FILES.getlist("files"):
             file.seek(0)
@@ -96,6 +102,9 @@ class UploadDatasetView(CreateAPIView):
                 },
                 column_schema=metadata.get("column_schema", []),
             )
+
+        dataset.completeness_score = compute_completeness(dataset)
+        dataset.save()
 
         response_data = DatasetSerializer(instance=dataset)
         return Response(

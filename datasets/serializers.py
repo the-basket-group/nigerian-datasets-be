@@ -8,6 +8,7 @@ from django.core.files.base import File
 from rest_framework import serializers
 
 from datasets.models import Dataset, DatasetFile, DatasetVersion
+from datasets.utils import validate_file_size
 
 
 class FileExtensionValidator:
@@ -57,6 +58,9 @@ class FileExtensionValidator:
 
 
 class CreateDatasetSerializer(serializers.ModelSerializer):
+    tags = serializers.ListField(
+        child=serializers.CharField(max_length=25), required=False
+    ),
     files = serializers.ListField(
         child=serializers.FileField(
             allow_empty_file=False,
@@ -64,7 +68,8 @@ class CreateDatasetSerializer(serializers.ModelSerializer):
             validators=[
                 FileExtensionValidator(
                     allowed_extensions=[".csv", ".xlsx", ".json", ".parquet"]
-                )
+                ),
+                validate_file_size
             ],
         ),
         min_length=1,
