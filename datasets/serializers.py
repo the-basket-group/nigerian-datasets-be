@@ -97,7 +97,8 @@ class CreateDatasetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Dataset
-        read_only_fields = ["downloads", "views", "completeness_score", "changelog"]
+        read_only_fields = ["downloads", "views",
+                            "completeness_score", "changelog"]
         fields = read_only_fields + [
             "title",
             "description",
@@ -134,3 +135,43 @@ class DatasetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dataset
         fields = "__all__"
+
+
+class UpdateDatasetSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Dataset
+        fields = [
+            "title",
+            "description",
+            "license",
+            "source_org",
+            "geography",
+            "update_frequency",
+            "is_public",
+            "metadata",
+            "tags"
+        ]
+
+
+class UpdateDatasetVersionSerializer(serializers.Serializer):
+    current_version_number = serializers.IntegerField(required=True)
+    dataset_files_to_retain = serializers.ListField(
+        child=serializers.UUIDField(), default=[], allow_null=False)
+    
+    files = serializers.ListField(
+        child=serializers.FileField(
+            allow_empty_file=False,
+            allow_null=False,
+            validators=[
+                FileExtensionValidator(
+                    allowed_extensions=[".csv", ".xlsx", ".json", ".parquet"]
+                )
+            ],
+        ),
+        default=[]
+    )
+    
+    def validate(self, data):
+        if not data.get('dataset_files_to_retain') and not data.get('files'):
+            raise serializers.ValidationError("Either dataset_files_to_retain or files must be provided")
+        return data

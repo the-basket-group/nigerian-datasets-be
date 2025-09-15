@@ -59,7 +59,8 @@ class DatasetVersion(models.Model):
     dataset = models.ForeignKey(
         "datasets.Dataset", on_delete=models.CASCADE, related_name="versions"
     )
-    version_label = models.CharField(default="v1.0.0", max_length=20)
+    version_number = models.IntegerField(default=1)
+    version_label = models.CharField(default="v1", max_length=20)
     metadata = models.JSONField(default=dict)
     changelog = models.JSONField(default=list)
     owner = models.ForeignKey(
