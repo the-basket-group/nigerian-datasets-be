@@ -44,8 +44,14 @@ jobs:
           # Check if the MAIN service already exists (not PR services)
           if gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)' 2>/dev/null; then
             echo "SERVICE_EXISTS=true" >> $GITHUB_OUTPUT
-            # Get the existing MAIN service URL
-            SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)')
+            # Get the correct URL format from the URLs annotation
+            SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format="value(metadata.annotations['run.googleapis.com/urls'])" | jq -r '.[0]' 2>/dev/null || true)
+
+            # Fallback to status.url if the annotation method fails
+            if [ -z "$SERVICE_URL" ] || [ "$SERVICE_URL" = "null" ]; then
+              SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)')
+            fi
+
             SERVICE_HOST=$(echo $SERVICE_URL | sed 's|^https://||' | sed 's|^http://||' | sed 's|/$||')
             echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
             echo "SERVICE_HOST=$SERVICE_HOST" >> $GITHUB_OUTPUT
@@ -119,9 +125,14 @@ jobs:
           # Extract the Service URL from the deployment output
           SERVICE_URL=$(echo "$DEPLOY_OUTPUT" | grep "Service URL:" | sed 's/Service URL: //')
 
-          # If we didn't get it from output, try describe command
+          # If we didn't get it from output, try describe command with correct URL format
           if [ -z "$SERVICE_URL" ]; then
-            SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)')
+            SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format="value(metadata.annotations['run.googleapis.com/urls'])" | jq -r '.[0]' 2>/dev/null || true)
+
+            # Fallback to status.url if the annotation method fails
+            if [ -z "$SERVICE_URL" ] || [ "$SERVICE_URL" = "null" ]; then
+              SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)')
+            fi
           fi
 
           # Extract hostname

@@ -44,18 +44,35 @@ jobs:
         run: |
           SERVICE_NAME="ng-datasets-be-pr-${{ github.event.number }}"
 
-          # Check if THIS SPECIFIC PR's service already exists
-          if gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)' 2>/dev/null; then
+          # Check if the service exists and get its EXACT URL from Cloud Run
+          echo "Checking if service $SERVICE_NAME exists..."
+
+          # Use gcloud run services list to get the exact URL
+          SERVICE_INFO=$(gcloud run services list --platform managed --region us-central1 --filter="metadata.name:$SERVICE_NAME" --format="value(status.url)" 2>/dev/null || true)
+
+          if [ -n "$SERVICE_INFO" ] && [ "$SERVICE_INFO" != "" ]; then
             echo "SERVICE_EXISTS=true" >> $GITHUB_OUTPUT
-            # Get the existing PR service URL
-            SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)')
+
+            # Get the correct URL format from the URLs annotation
+            SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format="value(metadata.annotations['run.googleapis.com/urls'])" | jq -r '.[0]' 2>/dev/null || true)
+
+            # Fallback to status.url if the annotation method fails
+            if [ -z "$SERVICE_URL" ] || [ "$SERVICE_URL" = "null" ]; then
+              SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format="value(status.url)" 2>/dev/null || true)
+            fi
+
+            # Extract hostname from URL
             SERVICE_HOST=$(echo $SERVICE_URL | sed 's|^https://||' | sed 's|^http://||' | sed 's|/$||')
+
             echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
             echo "SERVICE_HOST=$SERVICE_HOST" >> $GITHUB_OUTPUT
-            echo "PR #${{ github.event.number }} service exists with URL: $SERVICE_URL"
+
+            echo "✅ PR service exists!"
+            echo "   URL: $SERVICE_URL"
+            echo "   Host: $SERVICE_HOST"
           else
             echo "SERVICE_EXISTS=false" >> $GITHUB_OUTPUT
-            echo "PR #${{ github.event.number }} service does not exist, will create new one"
+            echo "❌ PR service does not exist, will create new one"
           fi
 
       - name: Deploy Preview to Cloud Run
@@ -76,23 +93,25 @@ jobs:
           BUCKET_NAME: ${{ vars.BUCKET_NAME }}
           SERVICE_EXISTS: ${{ steps.check_service.outputs.SERVICE_EXISTS }}
           EXISTING_HOST: ${{ steps.check_service.outputs.SERVICE_HOST }}
+          EXISTING_URL: ${{ steps.check_service.outputs.SERVICE_URL }}
         run: |
           SERVICE_NAME="ng-datasets-be-pr-${{ github.event.number }}"
 
           echo "Deploying preview service for PR #${{ github.event.number }}: $SERVICE_NAME"
 
-          # If THIS PR's service exists, use its existing hostname
-          # Otherwise use wildcard temporarily
+          # If PR service exists, use its EXACT hostname from the check step
           if [ "$SERVICE_EXISTS" = "true" ]; then
             ALLOWED_HOSTS_VALUE="$EXISTING_HOST"
-            echo "Using existing PR #${{ github.event.number }} service hostname: $ALLOWED_HOSTS_VALUE"
+            echo "📍 Using existing PR service URL: $EXISTING_URL"
+            echo "🔒 Setting ALLOWED_HOSTS to: $ALLOWED_HOSTS_VALUE"
           else
             ALLOWED_HOSTS_VALUE="*"
-            echo "Creating new PR #${{ github.event.number }} service, will update ALLOWED_HOSTS after deployment"
+            echo "🆕 Creating new PR service, will set ALLOWED_HOSTS after deployment"
           fi
 
-          # Deploy the PR-specific service and capture output
-          DEPLOY_OUTPUT=$(gcloud run deploy $SERVICE_NAME \
+          # Deploy the PR-specific service
+          echo "Deploying..."
+          gcloud run deploy $SERVICE_NAME \
             --source . \
             --platform managed \
             --region us-central1 \
@@ -115,40 +134,50 @@ jobs:
             --set-env-vars "^@^GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}" \
             --set-env-vars "^@^GOOGLE_AUTH_SCOPE=${GOOGLE_AUTH_SCOPE}" \
             --set-env-vars "BUCKET_NAME=${BUCKET_NAME}" \
-            --set-env-vars "ALLOWED_HOSTS=${ALLOWED_HOSTS_VALUE}" 2>&1)
+            --set-env-vars "ALLOWED_HOSTS=${ALLOWED_HOSTS_VALUE}"
 
-          echo "$DEPLOY_OUTPUT"
-
-          # Extract the Service URL from the deployment output (this is the correct one)
-          SERVICE_URL=$(echo "$DEPLOY_OUTPUT" | grep "Service URL:" | sed 's/Service URL: //')
-
-          # If we didn't get it from output, try describe command
-          if [ -z "$SERVICE_URL" ]; then
-            SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format='value(status.url)')
-          fi
-
-          # Extract hostname from the URL
-          SERVICE_HOST=$(echo $SERVICE_URL | sed 's|^https://||' | sed 's|^http://||' | sed 's|/$||')
-
-          # If this was a NEW PR service, update ALLOWED_HOSTS with correct hostname
+          # If this was a NEW PR service, get its URL and update ALLOWED_HOSTS
           if [ "$SERVICE_EXISTS" = "false" ]; then
             echo ""
-            echo "New PR #${{ github.event.number }} service created, updating ALLOWED_HOSTS..."
-            echo "Full Service URL: $SERVICE_URL"
-            echo "Extracted hostname for ALLOWED_HOSTS: $SERVICE_HOST"
+            echo "🔍 Getting URL for newly created PR service..."
 
-            # Update ALLOWED_HOSTS with the actual hostname from deployment output
+            # Get the correct URL format from the URLs annotation
+            SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format="value(metadata.annotations['run.googleapis.com/urls'])" | jq -r '.[0]' 2>/dev/null || true)
+
+            # Fallback to status.url if the annotation method fails
+            if [ -z "$SERVICE_URL" ] || [ "$SERVICE_URL" = "null" ]; then
+              SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format="value(status.url)")
+            fi
+
+            SERVICE_HOST=$(echo $SERVICE_URL | sed 's|^https://||' | sed 's|^http://||' | sed 's|/$||')
+
+            echo "📍 New PR service URL: $SERVICE_URL"
+            echo "🔒 Updating ALLOWED_HOSTS to: $SERVICE_HOST"
+
+            # Update ALLOWED_HOSTS with the actual hostname
             gcloud run services update $SERVICE_NAME \
               --region us-central1 \
               --update-env-vars "ALLOWED_HOSTS=$SERVICE_HOST"
 
-            echo "✅ Successfully updated ALLOWED_HOSTS to: $SERVICE_HOST"
+            echo "✅ ALLOWED_HOSTS updated successfully"
             echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
           else
-            # PR service already existed, use its existing URL
-            echo "Using existing PR #${{ github.event.number }} service URL: ${{ steps.check_service.outputs.SERVICE_URL }}"
-            echo "SERVICE_URL=${{ steps.check_service.outputs.SERVICE_URL }}" >> $GITHUB_ENV
+            # PR service already existed, use the URL from check step
+            echo "SERVICE_URL=$EXISTING_URL" >> $GITHUB_ENV
           fi
+
+      - name: Verify deployment
+        run: |
+          SERVICE_NAME="ng-datasets-be-pr-${{ github.event.number }}"
+          echo ""
+          echo "🔍 Verifying deployment configuration..."
+
+          # Get current ALLOWED_HOSTS value
+          CURRENT_ALLOWED_HOSTS=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format="export" | grep "ALLOWED_HOSTS" | cut -d'"' -f4)
+
+          echo "✅ Preview deployment successful!"
+          echo "📍 Service URL: ${{ env.SERVICE_URL }}"
+          echo "🔒 ALLOWED_HOSTS is set to: $CURRENT_ALLOWED_HOSTS"
 
       - name: Comment PR with preview URL
         uses: actions/github-script@v7
@@ -192,11 +221,3 @@ jobs:
                 body: body
               });
             }
-
-      - name: Add cleanup workflow
-        if: steps.check_service.outputs.SERVICE_EXISTS == 'false'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            // This ensures that the PR service gets deleted when PR is closed/merged
-            console.log('PR service created. It will be automatically deleted when the PR is closed or merged.');
