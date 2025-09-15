@@ -2,7 +2,7 @@ import csv
 import os
 from datetime import datetime
 from typing import Any, TypedDict
-
+from datasets.models import Dataset
 import pandas as pd
 from charset_normalizer import from_bytes
 from django.core.files.uploadedfile import InMemoryUploadedFile
@@ -151,29 +151,42 @@ def compute_metadata(file: InMemoryUploadedFile) -> dict[str, Any] | None:
 
     return metadata
 
-# File size validation
-MAX_FILE_SIZE = 200 * 1024 * 1024
 
-def validate_file_size(file: InMemoryUploadedFile) -> None:
-    if file.size > MAX_FILE_SIZE:
-        raise ValueError(
-            f"File size {file.size/1024/1024:.2f} MB exceeds the 200MB limit."
-        )
-    
 # Completeness score
-def compute_completeness(dataset) -> int:
-    required_fields = [
-        dataset.title,
-        dataset.description,
-        dataset.license,
-        dataset.source_org,
-        dataset.geography,
-        dataset.update_frequency,
-    ]
-    required_fields.append(dataset.tags.exists())
+def compute_completeness(dataset: Dataset) -> int:
+    score = 0
+    total = 10
 
-    filled = sum(bool(field) for field in required_fields)
-    total = len(required_fields)
+    if dataset.title:
+        score += 1
 
-    score = int((filled / total) * 100) if total > 0 else 0
-    return score
+    if dataset.description and len(dataset.description.strip()) >= 20:
+        score += 1
+
+    if dataset.license:
+        score += 1
+
+    if dataset.source_org:
+        score += 1
+
+    if dataset.update_frequency and dataset.update_frequency.lower() != "never":
+        score += 1
+
+    if dataset.tags.exists() and dataset.tags.count() >= 3:
+        score += 2
+
+    metadata = dataset.metadata or {}
+    if metadata and not metadata.get("meta_generation_failure", False):
+        score += 2
+
+    column_schema = metadata.get("column_schema", [])
+    rows = metadata.get("structure", {}).get("rows", 0)
+
+    if column_schema and rows > 0:
+        total_nulls = sum(col.get("missing_or_null_count", 0) for col in column_schema)
+        total_cells = rows * len(column_schema)
+        null_ratio = total_nulls / total_cells if total_cells > 0 else 1
+        if null_ratio < 0.2:
+            score += 2
+
+    return int((score / total) * 100)

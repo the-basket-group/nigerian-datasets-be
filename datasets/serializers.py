@@ -8,7 +8,6 @@ from django.core.files.base import File
 from rest_framework import serializers
 
 from datasets.models import Dataset, DatasetFile, DatasetVersion
-from datasets.utils import validate_file_size
 
 
 class FileExtensionValidator:
@@ -57,10 +56,32 @@ class FileExtensionValidator:
             )
 
 
+class FileSizeValidator:
+    def __init__(self, min_size: int = 0, max_size: int | None = None) -> None:
+        self.min_size = min_size
+        self.max_size = max_size
+
+    def __call__(self, value: File) -> None:
+        if value.size is None:
+            raise serializers.ValidationError("File size cannot be determined")
+
+        if value.size < self.min_size:
+            raise serializers.ValidationError(
+                f"File size {value.size / 1024:.2f} KB is smaller than the minimum {self.min_size / 1024:.2f} KB limit."
+            )
+
+        if self.max_size is not None and value.size > self.max_size:
+            raise serializers.ValidationError(
+                f"File size {value.size / 1024 / 1024:.2f} MB exceeds the {self.max_size / 1024 / 1024:.2f} MB limit."
+            )
+
+
 class CreateDatasetSerializer(serializers.ModelSerializer):
-    tags = serializers.ListField(
-        child=serializers.CharField(max_length=25), required=False
-    ),
+    tags = (
+        serializers.ListField(
+            child=serializers.CharField(max_length=25), required=False
+        ),
+    )
     files = serializers.ListField(
         child=serializers.FileField(
             allow_empty_file=False,
@@ -69,7 +90,7 @@ class CreateDatasetSerializer(serializers.ModelSerializer):
                 FileExtensionValidator(
                     allowed_extensions=[".csv", ".xlsx", ".json", ".parquet"]
                 ),
-                validate_file_size
+                FileSizeValidator(max_size=200 * 1024 * 1024),
             ],
         ),
         min_length=1,
