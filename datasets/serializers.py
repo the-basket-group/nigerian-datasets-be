@@ -78,8 +78,8 @@ class FileSizeValidator:
 
 class CreateDatasetSerializer(serializers.ModelSerializer):
     tags = serializers.ListField(
-            child=serializers.CharField(max_length=25), required=False
-        )
+        child=serializers.CharField(max_length=25), required=False
+    )
     files = serializers.ListField(
         child=serializers.FileField(
             allow_empty_file=False,

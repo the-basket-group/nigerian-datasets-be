@@ -2,7 +2,7 @@ import csv
 import os
 from datetime import datetime
 from typing import Any, TypedDict
-from datasets.models import Dataset
+
 import pandas as pd
 from charset_normalizer import from_bytes
 from django.core.files.uploadedfile import InMemoryUploadedFile
@@ -11,6 +11,7 @@ from google.oauth2 import service_account
 from pandas.api.types import infer_dtype, is_numeric_dtype
 
 from core.config import application_config
+from datasets.models import Dataset
 
 
 class FileMetadata(TypedDict):
