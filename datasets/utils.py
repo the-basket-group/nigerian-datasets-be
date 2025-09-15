@@ -11,6 +11,7 @@ from google.oauth2 import service_account
 from pandas.api.types import infer_dtype, is_numeric_dtype
 
 from core.config import application_config
+from datasets.models import Dataset
 
 
 class FileMetadata(TypedDict):
@@ -150,3 +151,43 @@ def compute_metadata(file: InMemoryUploadedFile) -> dict[str, Any] | None:
         pass
 
     return metadata
+
+
+# Completeness score
+def compute_completeness(dataset: Dataset) -> int:
+    score = 0
+    total = 10
+
+    if dataset.title:
+        score += 1
+
+    if dataset.description and len(dataset.description.strip()) >= 20:
+        score += 1
+
+    if dataset.license:
+        score += 1
+
+    if dataset.source_org:
+        score += 1
+
+    if dataset.update_frequency and dataset.update_frequency.lower() != "never":
+        score += 1
+
+    if dataset.tags.exists() and dataset.tags.count() >= 3:
+        score += 2
+
+    metadata = dataset.metadata or {}
+    if metadata and not metadata.get("meta_generation_failure", False):
+        score += 2
+
+    column_schema = metadata.get("column_schema", [])
+    rows = metadata.get("structure", {}).get("rows", 0)
+
+    if column_schema and rows > 0:
+        total_nulls = sum(col.get("missing_or_null_count", 0) for col in column_schema)
+        total_cells = rows * len(column_schema)
+        null_ratio = total_nulls / total_cells if total_cells > 0 else 1
+        if null_ratio < 0.2:
+            score += 2
+
+    return int((score / total) * 100)
