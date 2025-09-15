@@ -145,7 +145,7 @@ jobs:
 
             # If that doesn't work, try from the list
             if [ -z "$SERVICE_URL" ]; then
-              SERVICE_URL=$(gcloud run services list --platform managed --region us-central1 --filter="metadata.name:$SERVICE_NAME" --format="value(status.url)")
+              SERVICE_URL=$(gcloud run services list --platform managed --region us-central1 --filter="metadata.name:$SERVICE_NAME" --format="value(status.address.url)")
             fi
 
             SERVICE_HOST=$(echo $SERVICE_URL | sed 's|^https://||' | sed 's|^http://||' | sed 's|/$||')
