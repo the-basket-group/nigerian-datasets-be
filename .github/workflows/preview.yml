@@ -52,12 +52,13 @@ jobs:
 
           if [ -n "$SERVICE_INFO" ] && [ "$SERVICE_INFO" != "" ]; then
             echo "SERVICE_EXISTS=true" >> $GITHUB_OUTPUT
-            SERVICE_URL="$SERVICE_INFO"
 
-            # Double-check with describe command to ensure we have the right URL
-            DESCRIBE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format="value(status.url)" 2>/dev/null || true)
-            if [ -n "$DESCRIBE_URL" ] && [[ "$DESCRIBE_URL" == *"864721386499"* || "$DESCRIBE_URL" == *"run.app"* ]]; then
-              SERVICE_URL="$DESCRIBE_URL"
+            # Get the correct URL format from the URLs annotation
+            SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format="value(metadata.annotations['run.googleapis.com/urls'])" | jq -r '.[0]' 2>/dev/null || true)
+
+            # Fallback to status.url if the annotation method fails
+            if [ -z "$SERVICE_URL" ] || [ "$SERVICE_URL" = "null" ]; then
+              SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format="value(status.url)" 2>/dev/null || true)
             fi
 
             # Extract hostname from URL
@@ -140,12 +141,12 @@ jobs:
             echo ""
             echo "🔍 Getting URL for newly created PR service..."
 
-            # Get the URL from the service that was just created
-            SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format="value(status.url)")
+            # Get the correct URL format from the URLs annotation
+            SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format="value(metadata.annotations['run.googleapis.com/urls'])" | jq -r '.[0]' 2>/dev/null || true)
 
-            # If that doesn't work, try from the list
-            if [ -z "$SERVICE_URL" ]; then
-              SERVICE_URL=$(gcloud run services list --platform managed --region us-central1 --filter="metadata.name:$SERVICE_NAME" --format="value(status.address.url)")
+            # Fallback to status.url if the annotation method fails
+            if [ -z "$SERVICE_URL" ] || [ "$SERVICE_URL" = "null" ]; then
+              SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region us-central1 --format="value(status.url)")
             fi
 
             SERVICE_HOST=$(echo $SERVICE_URL | sed 's|^https://||' | sed 's|^http://||' | sed 's|/$||')
