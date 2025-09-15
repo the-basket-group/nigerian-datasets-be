@@ -9,10 +9,13 @@ from rest_framework.response import Response
 
 from datasets.models import Dataset, DatasetFile, DatasetVersion, Tag
 from datasets.serializers import CreateDatasetSerializer, DatasetSerializer
-from datasets.utils import compute_metadata, upload_datasetfile_to_gcloud
+from datasets.utils import (
+    compute_completeness,
+    compute_metadata,
+    upload_datasetfile_to_gcloud,
+)
 from users.models import User
 from users.permissions import is_accessible
-from datasets.utils import compute_completeness
 
 PageNumberPagination.page_size = 20
 
@@ -38,7 +41,7 @@ class UploadDatasetView(CreateAPIView):
             and serializer.validated_data["status"] == "published"
             else None
         )
-       
+
         dataset = Dataset.objects.create(
             title=serializer.validated_data["title"],
             description=serializer.validated_data.get("description", ""),
