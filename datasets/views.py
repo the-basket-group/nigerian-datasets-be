@@ -1,11 +1,16 @@
-import base64
 import hashlib
 import os
 from typing import Any
 
-
+from django.db import transaction
+from django.db.models import Q, QuerySet
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import CreateAPIView, ListAPIView, UpdateAPIView, RetrieveAPIView
+from rest_framework.generics import (
+    CreateAPIView,
+    ListAPIView,
+    RetrieveAPIView,
+    UpdateAPIView,
+)
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -13,7 +18,13 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from datasets.models import Dataset, DatasetFile, DatasetVersion, Tag
-from datasets.serializers import CreateDatasetSerializer, DatasetSerializer, DatasetVersionSerializer, UpdateDatasetSerializer, UpdateDatasetVersionSerializer
+from datasets.serializers import (
+    CreateDatasetSerializer,
+    DatasetSerializer,
+    DatasetVersionSerializer,
+    UpdateDatasetSerializer,
+    UpdateDatasetVersionSerializer,
+)
 from datasets.utils import (
     compute_completeness,
     compute_metadata,
@@ -21,8 +32,6 @@ from datasets.utils import (
 )
 from users.models import User
 from users.permissions import is_accessible
-from django.db import transaction
-from django.db.models import Q
 
 PageNumberPagination.page_size = 20
 
@@ -55,8 +64,7 @@ class UploadDatasetView(CreateAPIView):
             license=serializer.validated_data.get("license", ""),
             source_org=serializer.validated_data.get("source_org", ""),
             geography=serializer.validated_data.get("geography", "Nigeria"),
-            update_frequency=serializer.validated_data.get(
-                "update_frequency", "never"),
+            update_frequency=serializer.validated_data.get("update_frequency", "never"),
             is_public=serializer.validated_data.get("is_public", False),
             metadata=serializer.validated_data.get("metadata", {}),
             status=serializer.validated_data.get("status", "draft"),
@@ -76,8 +84,7 @@ class UploadDatasetView(CreateAPIView):
 
         dataset_version = DatasetVersion.objects.create(
             dataset=dataset,
-            version_label=serializer.validated_data.get(
-                "version_label", "v1.0.0"),
+            version_label=serializer.validated_data.get("version_label", "v1.0.0"),
             metadata={},
             changelog=[],
             owner=owner,
@@ -137,90 +144,123 @@ class ListDatasetView(ListAPIView):
 class UpdateDatasetView(UpdateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = UpdateDatasetSerializer
-    lookup_field = 'id'
-    lookup_url_kwarg = 'id'
+    lookup_field = "id"
+    lookup_url_kwarg = "id"
 
-    def get_queryset(self):
-        return Dataset.objects.filter(owner=self.request.user)
+    def get_queryset(self) -> QuerySet[Dataset]:
+        owner: User = User.objects.get(id=str(self.request.user.id))
+        return Dataset.objects.filter(owner=owner)
 
-    def update(self, request, *args, **kwargs) -> Response:
+    def update(self, request: Request) -> Response:
         if not request.data:
-            raise ValidationError(
-                detail={"message": "provide data to update dataset"})
+            raise ValidationError(detail={"message": "provide data to update dataset"})
         instance = self.get_object()
         serializer = self.get_serializer(
-            instance=instance, data=request.data, partial=True)
+            instance=instance, data=request.data, partial=True
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
-        return Response(data={
-            "success": True,
-            "message": "successfully updated dataset", "dataset": serializer.data
-        })
+        return Response(
+            data={
+                "success": True,
+                "message": "successfully updated dataset",
+                "dataset": serializer.data,
+            }
+        )
 
 
 class RetrieveDatasetView(RetrieveAPIView):
     serializer_class = DatasetSerializer
-    lookup_field = 'id'
-    lookup_url_kwarg = 'id'
+    lookup_field = "id"
+    lookup_url_kwarg = "id"
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Dataset]:
         if self.request.user.is_authenticated:
-            return Dataset.objects.filter(Q(owner=self.request.user) | Q(is_public=True))
+            return Dataset.objects.filter(
+                Q(owner=self.request.user) | Q(is_public=True)
+            )
         return Dataset.objects.filter(is_public=True)
 
 
 class UpdateDatasetVersion(UpdateAPIView):
     serializer_class = UpdateDatasetVersionSerializer
     permission_classes = [IsAuthenticated]
-    lookup_field = 'id'
-    lookup_url_kwarg = 'id'
+    lookup_field = "id"
+    lookup_url_kwarg = "id"
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[DatasetVersion]:
+        owner: User = User.objects.get(id=str(self.request.user.id))
         try:
-            dataset = Dataset.objects.get(
-                id=self.kwargs.get("id"), owner=self.request.user)
-            return DatasetVersion.objects.filter(owner=self.request.user, dataset=dataset)
+            dataset = Dataset.objects.get(id=self.kwargs.get("id"), owner=owner)
+            return DatasetVersion.objects.filter(owner=owner, dataset=dataset)
         except Dataset.DoesNotExist as e:
-            raise ValidationError(detail={
-                "message": "dataset does not exist or invalid permission to update"
-            }) from e
+            raise ValidationError(
+                detail={
+                    "message": "dataset does not exist or invalid permission to update"
+                }
+            ) from e
 
-    def update(self, request, *args, **kwargs) -> Response:
+    def update(self, request: Request, **kwargs: Any) -> Response:
+        owner: User = User.objects.get(id=str(request.user.id))
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        dataset_id = kwargs.get("id")
+        dataset_id: str = kwargs.get("id", "")
         retain_ids = serializer.validated_data.get("dataset_files_to_retain", [])
         current_version_number = serializer.validated_data.get("current_version_number")
 
         try:
-            dataset = Dataset.objects.get(id=dataset_id, owner=request.user)
-        except Dataset.DoesNotExist:
-            raise ValidationError({"message": "dataset does not exist or invalid permission to update"})
-
+            dataset = Dataset.objects.get(id=dataset_id, owner=owner)
+        except Dataset.DoesNotExist as e:
+            raise ValidationError(
+                {"message": "dataset does not exist or invalid permission to update"}
+            ) from e
 
         try:
             with transaction.atomic():
                 try:
-                    current_version = (
-                        DatasetVersion.objects
-                            .get(version_number=current_version_number, dataset=dataset)
+                    current_version = DatasetVersion.objects.get(
+                        version_number=current_version_number, dataset=dataset
+                    )
+                    latest_version = (
+                        DatasetVersion.objects.filter(dataset=dataset)
+                        .order_by("-version_number")
+                        .first()
+                    )
+                    if (
+                        latest_version
+                        and current_version.version_number
+                        != latest_version.version_number
+                    ):
+                        raise ValidationError(
+                            {
+                                "message": "can only update the latest version of this dataset"
+                            }
                         )
-                    latest_version = DatasetVersion.objects.filter(dataset=dataset).order_by('-version_number').first()
-                    if current_version.version_number != latest_version.version_number:
-                        raise ValidationError({"message": "can only update the latest version of this dataset"})
-                except DatasetVersion.DoesNotExist:
-                    raise ValidationError({"message": "current version does not exist for this dataset"})
+                except DatasetVersion.DoesNotExist as e:
+                    raise ValidationError(
+                        {"message": "current version does not exist for this dataset"}
+                    ) from e
 
-                previous_dataset_files_qs = DatasetFile.objects.filter(dataset_version=current_version)
+                previous_dataset_files_qs = DatasetFile.objects.filter(
+                    dataset_version=current_version
+                )
                 previous_count = previous_dataset_files_qs.count()
 
-                dataset_files_to_retain_qs = previous_dataset_files_qs.filter(id__in=retain_ids)
-                retained_file_ids = list(dataset_files_to_retain_qs.values_list("id", flat=True))
+                dataset_files_to_retain_qs = previous_dataset_files_qs.filter(
+                    id__in=retain_ids
+                )
+                retained_file_ids = list(
+                    dataset_files_to_retain_qs.values_list("id", flat=True)
+                )
 
                 if dataset_files_to_retain_qs.count() != len(retain_ids):
-                    raise ValidationError({"message": "one or more dataset_file ids to retain are missing or invalid"})
+                    raise ValidationError(
+                        {
+                            "message": "one or more dataset_file ids to retain are missing or invalid"
+                        }
+                    )
 
                 new_version_number = current_version.version_number + 1
                 new_version = DatasetVersion.objects.create(
@@ -229,7 +269,7 @@ class UpdateDatasetVersion(UpdateAPIView):
                     version_label=f"v{new_version_number}",
                     metadata={},
                     changelog=[],
-                    owner=request.user,
+                    owner=owner,
                 )
 
                 dataset_files = [
@@ -240,9 +280,9 @@ class UpdateDatasetVersion(UpdateAPIView):
                         file_format=df.file_format,
                         file_size_bytes=df.file_size_bytes,
                         checksum=df.checksum,
-                        owner=request.user,
+                        owner=owner,
                         metadata=df.metadata,
-                        column_schema=df.column_schema
+                        column_schema=df.column_schema,
                     )
                     for df in dataset_files_to_retain_qs
                 ]
@@ -253,10 +293,9 @@ class UpdateDatasetVersion(UpdateAPIView):
                     uploaded_file.seek(0)
                     md5_hex = hashlib.md5(uploaded_file.read()).hexdigest()
                     existing_dataset_file = DatasetFile.objects.filter(
-                        dataset_version=current_version,
-                        checksum=md5_hex
+                        dataset_version=current_version, checksum=md5_hex
                     ).first()
-                    
+
                     if existing_dataset_file:
                         if existing_dataset_file.id not in retained_file_ids:
                             dataset_files.append(
@@ -267,14 +306,13 @@ class UpdateDatasetVersion(UpdateAPIView):
                                     file_format=existing_dataset_file.file_format,
                                     file_size_bytes=existing_dataset_file.file_size_bytes,
                                     checksum=existing_dataset_file.checksum,
-                                    owner=request.user,
+                                    owner=owner,
                                     metadata=existing_dataset_file.metadata,
-                                    column_schema=existing_dataset_file.column_schema
+                                    column_schema=existing_dataset_file.column_schema,
                                 )
                             )
-                        # skip uploading again
                         continue
-                    
+
                     uploaded_file.seek(0)
                     file_info = upload_datasetfile_to_gcloud(uploaded_file)
                     _, ext = os.path.splitext(uploaded_file.name)
@@ -287,25 +325,35 @@ class UpdateDatasetVersion(UpdateAPIView):
                         file_format=ext,
                         file_size_bytes=file_info.size,
                         checksum=md5_hex,
-                        owner=request.user,
+                        owner=owner,
                         metadata={
                             "file_info": metadata.get("file_info"),
                             "structure": metadata.get("structure"),
-                            "extraction_timestamp": metadata.get("extraction_timestamp"),
+                            "extraction_timestamp": metadata.get(
+                                "extraction_timestamp"
+                            ),
                             "failure_reason": metadata.get("failure_reason"),
-                            "meta_generation_failure": metadata.get("meta_generation_failure", False),
-                            "meta_generation_failure_timestamp": metadata.get("meta_generation_failure_timestamp"),
+                            "meta_generation_failure": metadata.get(
+                                "meta_generation_failure", False
+                            ),
+                            "meta_generation_failure_timestamp": metadata.get(
+                                "meta_generation_failure_timestamp"
+                            ),
                         },
-                        column_schema=metadata.get("column_schema", [])
+                        column_schema=metadata.get("column_schema", []),
                     )
 
                     new_dataset_files.append(dataset_file)
 
-                # make sure that creating this new version, does not end up the same as old version 
-                # this means that new_dataset_files is not empty or the length of retained dataset files 
+                # make sure that creating this new version, does not end up the same as old version
+                # this means that new_dataset_files is not empty or the length of retained dataset files
                 # is not the same as the current version that exists.
                 if not new_dataset_files and len(dataset_files) == previous_count:
-                    raise ValidationError({"message": "attempt to create new version causes the same state as previous version"})
+                    raise ValidationError(
+                        {
+                            "message": "attempt to create new version causes the same state as previous version"
+                        }
+                    )
 
                 dataset_files.extend(new_dataset_files)
                 DatasetFile.objects.bulk_create(dataset_files)
@@ -318,4 +366,7 @@ class UpdateDatasetVersion(UpdateAPIView):
             return Response(data=exc.detail, status=400)
 
         except Exception as exc:
-            return Response(data={"message": "failed to process version update", "error": str(exc)}, status=500)
+            return Response(
+                data={"message": "failed to process version update", "error": str(exc)},
+                status=500,
+            )

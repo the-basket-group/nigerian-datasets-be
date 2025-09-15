@@ -2,6 +2,7 @@ import csv
 import json
 from io import StringIO
 from os import path
+from typing import Any
 
 import pandas as pd
 from django.core.files.base import File
@@ -97,8 +98,7 @@ class CreateDatasetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Dataset
-        read_only_fields = ["downloads", "views",
-                            "completeness_score", "changelog"]
+        read_only_fields = ["downloads", "views", "completeness_score", "changelog"]
         fields = read_only_fields + [
             "title",
             "description",
@@ -149,15 +149,16 @@ class UpdateDatasetSerializer(serializers.ModelSerializer):
             "update_frequency",
             "is_public",
             "metadata",
-            "tags"
+            "tags",
         ]
 
 
 class UpdateDatasetVersionSerializer(serializers.Serializer):
     current_version_number = serializers.IntegerField(required=True)
     dataset_files_to_retain = serializers.ListField(
-        child=serializers.UUIDField(), default=[], allow_null=False)
-    
+        child=serializers.UUIDField(), default=[], allow_null=False
+    )
+
     files = serializers.ListField(
         child=serializers.FileField(
             allow_empty_file=False,
@@ -168,10 +169,12 @@ class UpdateDatasetVersionSerializer(serializers.Serializer):
                 )
             ],
         ),
-        default=[]
+        default=[],
     )
-    
-    def validate(self, data):
-        if not data.get('dataset_files_to_retain') and not data.get('files'):
-            raise serializers.ValidationError("Either dataset_files_to_retain or files must be provided")
+
+    def validate(self, data: Any) -> Any:
+        if not data.get("dataset_files_to_retain") and not data.get("files"):
+            raise serializers.ValidationError(
+                "Either dataset_files_to_retain or files must be provided"
+            )
         return data
