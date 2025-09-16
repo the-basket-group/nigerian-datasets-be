@@ -10,7 +10,7 @@ from datasets.views import (
 
 urlpatterns = [
     path("", UploadDatasetView.as_view(), name="upload_dataset"),
-    path("search/", SearchDatasetView.as_view(), name="list_datasets"),
+    path("internal/search/", SearchDatasetView.as_view(), name="list_datasets"),
     path("<str:id>/update/", UpdateDatasetView.as_view(), name="update_dataset"),
     path("<str:id>/view/", RetrieveDatasetView.as_view(), name="retrieve_dataset"),
     path(
