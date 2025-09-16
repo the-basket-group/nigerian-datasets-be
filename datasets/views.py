@@ -7,7 +7,6 @@ from django.db.models import Q, QuerySet
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (
     CreateAPIView,
-    ListAPIView,
     RetrieveAPIView,
     UpdateAPIView,
 )
@@ -16,10 +15,12 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from datasets.models import Dataset, DatasetFile, DatasetVersion, Tag
 from datasets.serializers import (
     CreateDatasetSerializer,
+    DatasetSearchSerializer,
     DatasetSerializer,
     DatasetVersionSerializer,
     UpdateDatasetSerializer,
@@ -84,7 +85,8 @@ class UploadDatasetView(CreateAPIView):
 
         dataset_version = DatasetVersion.objects.create(
             dataset=dataset,
-            version_label=serializer.validated_data.get("version_label", "v1.0.0"),
+            version_label="v1",
+            version_number=1,
             metadata={},
             changelog=[],
             owner=owner,
@@ -122,6 +124,7 @@ class UploadDatasetView(CreateAPIView):
                     ),
                 },
                 column_schema=metadata.get("column_schema", []),
+                dataset=dataset,
             )
 
         dataset.completeness_score = compute_completeness(dataset)
@@ -133,12 +136,65 @@ class UploadDatasetView(CreateAPIView):
         )
 
 
-class ListDatasetView(ListAPIView):
-    serializer_class = DatasetSerializer
-    # TODO: search, filter and sort implementations
+class SearchDatasetView(APIView):
     # TODO: user-level Dataset viewing
     queryset = Dataset.objects.all()
     pagination_class = PageNumberPagination
+
+    def post(self, request: Request) -> Response:
+        serializer = DatasetSearchSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # form the query builder of kwargs
+        base_query = Q(is_public=True)
+
+        if request.user.is_authenticated:
+            base_query = base_query | Q(owner=request.user)
+
+        secondary_query = Q()
+        filters = serializer.validated_data
+        if "search" in filters:
+            secondary_query = Q(title__icontains=filters["search"]) | Q(
+                description__icontains=filters["search"]
+            )
+
+        if "file_types" in filters:
+            secondary_query = secondary_query & Q(
+                files__file_format__in=filters["file_types"]
+            )
+
+        if "licenses" in filters:
+            secondary_query = secondary_query & Q(license__in=filters["licenses"])
+
+        if "min_completeness_score" in filters:
+            secondary_query = secondary_query & Q(
+                completeness_score__gte=filters["min_completeness_score"]
+            )
+
+        if "min_file_size" in filters:
+            secondary_query = secondary_query & Q(
+                files__file_size_bytes__gte=filters["min_file_size"]["byte_size"]
+            )
+
+        if "max_file_size" in filters:
+            secondary_query = secondary_query & Q(
+                files__file_size_bytes__lte=filters["max_file_size"]["byte_size"]
+            )
+
+        if "tags" in filters:
+            secondary_query = secondary_query & Q(
+                tags__name__in=[tag.lower().strip() for tag in filters["tags"]]
+            )
+
+        dataset_query = Dataset.objects.filter(base_query & secondary_query)
+        if "sort_keys" in filters:
+            dataset_query.order_by(*filters["sort_keys"])
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(dataset_query, request)
+
+        response_serializer = DatasetSerializer(instance=page, many=True)
+        return paginator.get_paginated_response(response_serializer.data)
 
 
 class UpdateDatasetView(UpdateAPIView):
@@ -283,6 +339,7 @@ class UpdateDatasetVersion(UpdateAPIView):
                         owner=owner,
                         metadata=df.metadata,
                         column_schema=df.column_schema,
+                        dataset=dataset,
                     )
                     for df in dataset_files_to_retain_qs
                 ]
@@ -309,6 +366,7 @@ class UpdateDatasetVersion(UpdateAPIView):
                                     owner=owner,
                                     metadata=existing_dataset_file.metadata,
                                     column_schema=existing_dataset_file.column_schema,
+                                    dataset=dataset,
                                 )
                             )
                         continue
@@ -341,6 +399,7 @@ class UpdateDatasetVersion(UpdateAPIView):
                             ),
                         },
                         column_schema=metadata.get("column_schema", []),
+                        dataset=dataset,
                     )
 
                     new_dataset_files.append(dataset_file)

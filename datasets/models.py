@@ -83,6 +83,9 @@ class DatasetFile(models.Model):
     dataset_version = models.ForeignKey(
         "datasets.DatasetVersion", on_delete=models.CASCADE, related_name="files"
     )
+    dataset = models.ForeignKey(
+        "datasets.Dataset", on_delete=models.CASCADE, related_name="files"
+    )
     upload_id = models.CharField(max_length=100)
     upload_url = models.URLField(blank=True)
     file_format = models.CharField(
