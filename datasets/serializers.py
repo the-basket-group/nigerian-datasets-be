@@ -2,6 +2,7 @@ import csv
 import json
 from io import StringIO
 from os import path
+from typing import Any
 
 import pandas as pd
 from django.core.files.base import File
@@ -134,3 +135,105 @@ class DatasetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dataset
         fields = "__all__"
+
+
+class UpdateDatasetSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Dataset
+        fields = [
+            "title",
+            "description",
+            "license",
+            "source_org",
+            "geography",
+            "update_frequency",
+            "is_public",
+            "metadata",
+            "tags",
+        ]
+
+
+class UpdateDatasetVersionSerializer(serializers.Serializer):
+    current_version_number = serializers.IntegerField(required=True)
+    dataset_files_to_retain = serializers.ListField(
+        child=serializers.UUIDField(), default=[], allow_null=False
+    )
+
+    files = serializers.ListField(
+        child=serializers.FileField(
+            allow_empty_file=False,
+            allow_null=False,
+            validators=[
+                FileExtensionValidator(
+                    allowed_extensions=[".csv", ".xlsx", ".json", ".parquet"]
+                )
+            ],
+        ),
+        default=[],
+    )
+
+    def validate(self, data: Any) -> Any:
+        if not data.get("dataset_files_to_retain") and not data.get("files"):
+            raise serializers.ValidationError(
+                "Either dataset_files_to_retain or files must be provided"
+            )
+        return data
+
+
+class FileSizeQuerySerializer(serializers.Serializer):
+    size = serializers.IntegerField(required=True)
+    unit = serializers.ChoiceField(choices=[("mb", "mb"), ("kb", "kb"), ("gb", "gb")])
+
+    def validate(self, data: Any) -> Any:
+        size = data["size"]
+        unit = data["unit"]
+
+        if unit == "mb":
+            byte_size = size * 1024 * 1024
+        elif unit == "kb":
+            byte_size = size * 1024
+        elif unit == "gb":
+            byte_size = size * 1024 * 1024 * 1024
+
+        data["byte_size"] = byte_size
+        return data
+
+
+class DatasetSearchSerializer(serializers.Serializer):
+    search = serializers.CharField(required=False)
+    tags = serializers.ListField(
+        child=serializers.CharField(allow_blank=False, allow_null=False), required=False
+    )
+    file_types = serializers.ListField(
+        child=serializers.ChoiceField(
+            choices=[
+                ("csv", "csv"),
+                ("json", "json"),
+                ("xlsx", "xlsx"),
+                ("parquet", "parquet"),
+            ],
+            allow_null=False,
+        ),
+        required=False,
+    )
+    licenses = serializers.ListField(
+        child=serializers.CharField(allow_blank=False, allow_null=False), required=False
+    )
+    min_file_size = FileSizeQuerySerializer(required=False)
+    max_file_size = FileSizeQuerySerializer(required=False)
+    min_completeness_score = serializers.IntegerField(required=False)
+    sort_keys = serializers.ListField(
+        required=False,
+        child=serializers.ChoiceField(
+            choices=[
+                ("-created_at", "-created_at"),
+                ("-updated_at", "-updated_at"),
+                ("-completeness_score", "-completeness_score"),
+                ("-downloads", "-downloads"),
+                ("-views", "-views"),
+                # TODO: sort by votes
+            ],
+            allow_null=False,
+        ),
+    )
+    # TODO: highly_voted_for (not applicable yet)

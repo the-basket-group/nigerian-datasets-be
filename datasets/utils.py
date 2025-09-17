@@ -156,7 +156,7 @@ def compute_metadata(file: InMemoryUploadedFile) -> dict[str, Any] | None:
 # Completeness score
 def compute_completeness(dataset: Dataset) -> int:
     score = 0
-    total = 10
+    # total = 10
 
     if dataset.title:
         score += 1
@@ -190,4 +190,5 @@ def compute_completeness(dataset: Dataset) -> int:
         if null_ratio < 0.2:
             score += 2
 
-    return int((score / total) * 100)
+    # return int((score / total) * 100)
+    return score
