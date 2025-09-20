@@ -1,9 +1,12 @@
 import csv
+import logging
 import os
 from datetime import datetime
 from typing import Any, TypedDict
+from uuid import UUID
 
 import pandas as pd
+from background_task import background
 from charset_normalizer import from_bytes
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from google.cloud import storage
@@ -11,7 +14,9 @@ from google.oauth2 import service_account
 from pandas.api.types import infer_dtype, is_numeric_dtype
 
 from core.config import application_config
-from datasets.models import Dataset
+from datasets.models import Dataset, DatasetFile, DatasetVersion
+
+logger = logging.getLogger(__name__)
 
 
 class FileMetadata(TypedDict):
@@ -192,3 +197,65 @@ def compute_completeness(dataset: Dataset) -> int:
 
     # return int((score / total) * 100)
     return score
+
+
+# Dataset deletion from GCS
+
+
+def delete_blob(blob_name: str) -> bool:
+    try:
+        cred = service_account.Credentials.from_service_account_info(
+            application_config.GOOGLE_SERVICE_ACCOUNT_INFO
+        )
+        storage_client = storage.Client(credentials=cred)
+        bucket = storage_client.bucket(application_config.BUCKET_NAME)
+
+        blob = bucket.blob(blob_name)
+        blob.delete()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to delete blob {blob_name}: {e}")
+        return False
+
+
+@background(schedule=0)
+def delete_dataset_task(dataset_id: str | UUID) -> None:
+    try:
+        dataset = Dataset.objects.prefetch_related("files").get(id=dataset_id)
+    except Dataset.DoesNotExist:
+        logger.warning(f"Dataset {dataset_id} not found")
+        return
+
+    for file in dataset.files.all():
+        delete_blob(file.upload_id)
+
+    dataset.delete()
+    logger.info(f"Dataset {dataset_id} deleted with all versions and files.")
+
+
+@background(schedule=0)
+def delete_version_task(version_id: str | UUID) -> None:
+    try:
+        version = DatasetVersion.objects.prefetch_related("files").get(id=version_id)
+    except DatasetVersion.DoesNotExist:
+        logger.warning(f"Version {version_id} not found")
+        return
+
+    for file in version.files.all():
+        delete_blob(file.upload_id)
+
+    version.delete()
+    logger.info(f"DatasetVersion {version_id} deleted with all files.")
+
+
+@background(schedule=0)
+def delete_file_task(file_id: str | UUID) -> None:
+    try:
+        file = DatasetFile.objects.get(id=file_id)
+    except DatasetFile.DoesNotExist:
+        logger.warning(f"File {file_id} not found")
+        return
+
+    delete_blob(file.upload_id)
+    file.delete()
+    logger.info(f"DatasetFile {file_id} deleted.")
