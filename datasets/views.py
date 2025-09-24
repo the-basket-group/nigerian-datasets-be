@@ -440,36 +440,21 @@ class DeleteDatasetView(DestroyAPIView):
     lookup_field = "id"
     lookup_url_kwarg = "id"
 
-    def get_queryset(self) -> QuerySet[Dataset]:
-        owner: User = User.objects.get(id=str(self.request.user.id))
-        try:
-            return Dataset.objects.filter(owner=owner)
-        except Dataset.DoesNotExist as e:
-            raise ValidationError(
-                detail={
-                    "message": "dataset does not exist or invalid permission to update"
-                }
-            ) from e
-
-        # return Dataset.objects.filter(owner=self.request.user)
-
     def destroy(self, request: Request, **kwargs: Any) -> Response:
-        # dataset_id = kwargs.get("id")
         dataset_id: str = kwargs.get("id", "")
         owner: User = User.objects.get(id=str(request.user.id))
         try:
             dataset = Dataset.objects.get(id=dataset_id, owner=owner)
-            # dataset = Dataset.objects.get(id=dataset_id, owner=request.user)
         except Dataset.DoesNotExist as e:
             raise ValidationError(
                 {"message": "dataset does not exist or invalid permission to delete"}
             ) from e
 
-        delete_dataset_task(dataset.id)
+        delete_dataset_task(str(dataset.id))
 
         return Response(
             data={
-                "message": f"dataset {dataset.title} scheduled for deletion",
+                "message": f"dataset {dataset.title} deleted",
             },
             status=202,
         )
@@ -479,20 +464,6 @@ class DeleteDatasetVersionView(DestroyAPIView):
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
     lookup_url_kwarg = "id"
-
-    def get_queryset(self) -> QuerySet[DatasetVersion]:
-        owner: User = User.objects.get(id=str(self.request.user.id))
-        try:
-            dataset = Dataset.objects.get(id=self.kwargs.get("id"), owner=owner)
-            return DatasetVersion.objects.filter(owner=owner, dataset=dataset)
-        except Dataset.DoesNotExist as e:
-            raise ValidationError(
-                detail={
-                    "message": "dataset version does not exist or invalid permission to update"
-                }
-            ) from e
-
-        # return DatasetVersion.objects.filter(owner=self.request.user)
 
     def destroy(self, request: Request, **kwargs: Any) -> Response:
         dataset_version_id: str = kwargs.get("id", "")
@@ -508,11 +479,11 @@ class DeleteDatasetVersionView(DestroyAPIView):
                 }
             ) from e
 
-        delete_version_task(dataset_version.id)
+        delete_version_task(str(dataset_version.id))
 
         return Response(
             data={
-                "message": f"dataset version {dataset_version.version_number} scheduled for deletion",
+                "message": f"dataset version {dataset_version.version_number} deleted",
             },
             status=202,
         )
@@ -522,20 +493,6 @@ class DeleteDatasetFileView(DestroyAPIView):
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
     lookup_url_kwarg = "id"
-
-    def get_queryset(self) -> QuerySet[DatasetFile]:
-        owner: User = User.objects.get(id=str(self.request.user.id))
-        try:
-            dataset = Dataset.objects.get(id=self.kwargs.get("id"), owner=owner)
-            return DatasetFile.objects.filter(owner=owner, dataset=dataset)
-        except Dataset.DoesNotExist as e:
-            raise ValidationError(
-                detail={
-                    "message": "dataset file does not exist or invalid permission to update"
-                }
-            ) from e
-
-        # return DatasetFile.objects.filter(owner=self.request.user)
 
     def destroy(self, request: Request, **kwargs: Any) -> Response:
         owner: User = User.objects.get(id=str(request.user.id))
@@ -549,11 +506,11 @@ class DeleteDatasetFileView(DestroyAPIView):
                 }
             ) from e
 
-        delete_file_task(dataset_file.id)
+        delete_file_task(str(dataset_file.id))
 
         return Response(
             data={
-                "message": f"dataset file {dataset_file.upload_id} scheduled for deletion",
+                "message": f"dataset file {dataset_file.upload_id} deleted",
             },
             status=202,
         )

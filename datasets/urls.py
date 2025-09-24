@@ -27,7 +27,7 @@ urlpatterns = [
         name="delete_dataset",
     ),
     path(
-        "<str:id>/versions/delete/",
+        "versions/<str:id>/delete/",
         DeleteDatasetVersionView.as_view(),
         name="delete_dataset_version",
     ),

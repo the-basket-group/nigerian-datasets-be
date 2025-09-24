@@ -223,7 +223,7 @@ def delete_dataset_task(dataset_id: str | UUID) -> None:
     try:
         dataset = Dataset.objects.prefetch_related("files").get(id=dataset_id)
     except Dataset.DoesNotExist:
-        logger.warning(f"Dataset {dataset_id} not found")
+        logger.warning("Dataset not found")
         return
 
     for file in dataset.files.all():
@@ -238,7 +238,7 @@ def delete_version_task(version_id: str | UUID) -> None:
     try:
         version = DatasetVersion.objects.prefetch_related("files").get(id=version_id)
     except DatasetVersion.DoesNotExist:
-        logger.warning(f"Version {version_id} not found")
+        logger.warning("Version not found")
         return
 
     for file in version.files.all():
@@ -253,7 +253,7 @@ def delete_file_task(file_id: str | UUID) -> None:
     try:
         file = DatasetFile.objects.get(id=file_id)
     except DatasetFile.DoesNotExist:
-        logger.warning(f"File {file_id} not found")
+        logger.warning("File not found")
         return
 
     delete_blob(file.upload_id)
