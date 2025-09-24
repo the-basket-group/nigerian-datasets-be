@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "django_filters",
     "drf_spectacular",
+    "background_task",
     "core",
     "users",
     "datasets",

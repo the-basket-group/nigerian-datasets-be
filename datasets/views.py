@@ -7,6 +7,7 @@ from django.db.models import Q, QuerySet
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (
     CreateAPIView,
+    DestroyAPIView,
     RetrieveAPIView,
     UpdateAPIView,
 )
@@ -29,6 +30,9 @@ from datasets.serializers import (
 from datasets.utils import (
     compute_completeness,
     compute_metadata,
+    delete_dataset_task,
+    delete_file_task,
+    delete_version_task,
     upload_datasetfile_to_gcloud,
 )
 from users.models import User
@@ -429,3 +433,84 @@ class UpdateDatasetVersion(UpdateAPIView):
                 data={"message": "failed to process version update", "error": str(exc)},
                 status=500,
             )
+
+
+class DeleteDatasetView(DestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    lookup_field = "id"
+    lookup_url_kwarg = "id"
+
+    def destroy(self, request: Request, **kwargs: Any) -> Response:
+        dataset_id: str = kwargs.get("id", "")
+        owner: User = User.objects.get(id=str(request.user.id))
+        try:
+            dataset = Dataset.objects.get(id=dataset_id, owner=owner)
+        except Dataset.DoesNotExist as e:
+            raise ValidationError(
+                {"message": "dataset does not exist or invalid permission to delete"}
+            ) from e
+
+        delete_dataset_task(str(dataset.id))
+
+        return Response(
+            data={
+                "message": f"dataset {dataset.title} deleted",
+            },
+            status=202,
+        )
+
+
+class DeleteDatasetVersionView(DestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    lookup_field = "id"
+    lookup_url_kwarg = "id"
+
+    def destroy(self, request: Request, **kwargs: Any) -> Response:
+        dataset_version_id: str = kwargs.get("id", "")
+        owner: User = User.objects.get(id=str(request.user.id))
+        try:
+            dataset_version = DatasetVersion.objects.get(
+                id=dataset_version_id, owner=owner
+            )
+        except DatasetVersion.DoesNotExist as e:
+            raise ValidationError(
+                {
+                    "message": "dataset version does not exist or invalid permission to delete"
+                }
+            ) from e
+
+        delete_version_task(str(dataset_version.id))
+
+        return Response(
+            data={
+                "message": f"dataset version {dataset_version.version_number} deleted",
+            },
+            status=202,
+        )
+
+
+class DeleteDatasetFileView(DestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    lookup_field = "id"
+    lookup_url_kwarg = "id"
+
+    def destroy(self, request: Request, **kwargs: Any) -> Response:
+        owner: User = User.objects.get(id=str(request.user.id))
+        dataset_file_id: str = kwargs.get("id", "")
+        try:
+            dataset_file = DatasetFile.objects.get(id=dataset_file_id, owner=owner)
+        except DatasetFile.DoesNotExist as e:
+            raise ValidationError(
+                {
+                    "message": "dataset file does not exist or invalid permission to delete"
+                }
+            ) from e
+
+        delete_file_task(str(dataset_file.id))
+
+        return Response(
+            data={
+                "message": f"dataset file {dataset_file.upload_id} deleted",
+            },
+            status=202,
+        )
