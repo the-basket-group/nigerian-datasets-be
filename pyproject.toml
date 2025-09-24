@@ -61,7 +61,7 @@ disallow_untyped_defs = true
 plugins = ["mypy_django_plugin.main"]
 
 [[tool.mypy.overrides]]
-module = "google.*"
+module = ["google.*", "background_task.*"]
 ignore_missing_imports = true
 
 [tool.django-stubs]
