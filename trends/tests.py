@@ -13,7 +13,7 @@ class VectorTrendingAnalyzerTests(TestCase):
     def setUp(self) -> None:
         self.analyzer = VectorTrendingAnalyzer("all-MiniLM-L6-v2", 0.7, 32)
 
-    @patch("trends.analyzers.SentenceTransformer")
+    @patch("trends.model_cache.SentenceTransformer")
     def test_model_lazy_loading_and_encoding(self, mock_transformer: MagicMock) -> None:
         mock_model = MagicMock()
         mock_model.encode.return_value = [[0.1, 0.2], [0.4, 0.5]]
@@ -51,8 +51,8 @@ class VectorTrendingAnalyzerTests(TestCase):
         self.assertEqual(result["method"], "single_query")
         self.assertEqual(result["trending_categories"][0]["query_count"], 3)
 
-    @patch("trends.analyzers.SentenceTransformer")
-    def test_similar_queries(self, mock_transformer: MagicMock) -> None:
+    @patch("trends.model_cache.model_cache.get_model")
+    def test_similar_queries(self, mock_get_model: MagicMock) -> None:
         mock_model = MagicMock()
         mock_model.encode.return_value = [
             [1.0, 0.0],
@@ -60,7 +60,7 @@ class VectorTrendingAnalyzerTests(TestCase):
             [0.5, 0.5],
             [0.0, 1.0],
         ]
-        mock_transformer.return_value = mock_model
+        mock_get_model.return_value = mock_model
 
         results = self.analyzer.find_similar_queries(
             ["python programming", "python tutorial", "javascript"], "python coding", 2
