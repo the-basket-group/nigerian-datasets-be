@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "core",
     "users",
     "datasets",
+    "trends",
 ]
 
 MIDDLEWARE = [
@@ -169,3 +170,10 @@ LOGGING = {
         "level": "INFO",
     },
 }
+
+# Trending Analysis Settings
+TRENDING_MODEL_NAME = os.environ.get("TRENDING_MODEL_NAME", "all-MiniLM-L6-v2")
+TRENDING_SIMILARITY_THRESHOLD = float(
+    os.environ.get("TRENDING_SIMILARITY_THRESHOLD", "0.7")
+)
+TRENDING_BATCH_SIZE = int(os.environ.get("TRENDING_BATCH_SIZE", "32"))

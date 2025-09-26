@@ -77,6 +77,9 @@ jobs:
           GOOGLE_REDIRECT_URI: ${{ vars.GOOGLE_REDIRECT_URI }}
           GOOGLE_AUTH_SCOPE: ${{ vars.GOOGLE_AUTH_SCOPE }}
           BUCKET_NAME: ${{ vars.BUCKET_NAME }}
+          TRENDING_MODEL_NAME: ${{ vars.TRENDING_MODEL_NAME }}
+          TRENDING_SIMILARITY_THRESHOLD: ${{ vars.TRENDING_SIMILARITY_THRESHOLD }}
+          TRENDING_BATCH_SIZE: ${{ vars.TRENDING_BATCH_SIZE }}
           SERVICE_EXISTS: ${{ steps.check_service.outputs.SERVICE_EXISTS }}
           EXISTING_HOST: ${{ steps.check_service.outputs.SERVICE_HOST }}
         run: |
@@ -118,6 +121,9 @@ jobs:
             --set-env-vars "^@^GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}" \
             --set-env-vars "^@^GOOGLE_AUTH_SCOPE=${GOOGLE_AUTH_SCOPE}" \
             --set-env-vars "BUCKET_NAME=${BUCKET_NAME}" \
+            --set-env-vars "TRENDING_MODEL_NAME=${TRENDING_MODEL_NAME}" \
+            --set-env-vars "TRENDING_SIMILARITY_THRESHOLD=${TRENDING_SIMILARITY_THRESHOLD}" \
+            --set-env-vars "TRENDING_BATCH_SIZE=${TRENDING_BATCH_SIZE}" \
             --set-env-vars "ALLOWED_HOSTS=${ALLOWED_HOSTS_VALUE}" 2>&1)
 
           echo "$DEPLOY_OUTPUT"
