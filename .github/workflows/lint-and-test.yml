@@ -115,7 +115,7 @@ jobs:
           DB_PASSWORD: postgres
           DB_HOST: localhost
           DB_PORT: 5432
-          TRENDING_MODEL_NAME: all-MiniLM-L6-v2
+          TRENDING_MODEL_NAME: paraphrase-albert-small-v2
           TRENDING_SIMILARITY_THRESHOLD: 0.7
           TRENDING_BATCH_SIZE: 32
         run: uv run python manage.py test

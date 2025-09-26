@@ -172,7 +172,9 @@ LOGGING = {
 }
 
 # Trending Analysis Settings
-TRENDING_MODEL_NAME = os.environ.get("TRENDING_MODEL_NAME", "all-MiniLM-L6-v2")
+TRENDING_MODEL_NAME = os.environ.get(
+    "TRENDING_MODEL_NAME", "paraphrase-albert-small-v2"
+)
 TRENDING_SIMILARITY_THRESHOLD = float(
     os.environ.get("TRENDING_SIMILARITY_THRESHOLD", "0.7")
 )

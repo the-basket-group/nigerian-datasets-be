@@ -18,7 +18,7 @@ class TrendsConfig(AppConfig):
                 from trends.model_cache import model_cache
 
                 model_name = getattr(
-                    settings, "TRENDING_MODEL_NAME", "all-MiniLM-L12-v2"
+                    settings, "TRENDING_MODEL_NAME", "paraphrase-albert-small-v2"
                 )
                 logger.info(f"Pre-loading trending model: {model_name}")
                 model_cache.get_model(model_name)

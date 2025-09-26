@@ -19,7 +19,9 @@ class ModelCache:
 
     def get_model(self, model_name: str | None = None) -> SentenceTransformer:
         if model_name is None:
-            model_name = getattr(settings, "TRENDING_MODEL_NAME", "all-MiniLM-L6-v2")
+            model_name = getattr(
+                settings, "TRENDING_MODEL_NAME", "paraphrase-albert-small-v2"
+            )
 
         if self._model is None:
             logger.info(f"Loading sentence transformer model: {model_name}")

@@ -11,7 +11,7 @@ from trends.analyzers import VectorTrendingAnalyzer
 
 class VectorTrendingAnalyzerTests(TestCase):
     def setUp(self) -> None:
-        self.analyzer = VectorTrendingAnalyzer("all-MiniLM-L6-v2", 0.7, 32)
+        self.analyzer = VectorTrendingAnalyzer("paraphrase-albert-small-v2", 0.7, 32)
 
     @patch("trends.model_cache.SentenceTransformer")
     def test_model_lazy_loading_and_encoding(self, mock_transformer: MagicMock) -> None:
@@ -23,7 +23,7 @@ class VectorTrendingAnalyzerTests(TestCase):
             ["python tutorial", "machine learning"]
         )
 
-        mock_transformer.assert_called_once_with("all-MiniLM-L6-v2")
+        mock_transformer.assert_called_once_with("paraphrase-albert-small-v2")
         self.assertEqual(len(embeddings), 2)
 
     def test_keyword_extraction_and_category_naming(self) -> None:

@@ -53,7 +53,9 @@ class TrendingAnalysisView(APIView):
     def analyzer(self) -> VectorTrendingAnalyzer:
         if self._analyzer is None:
             self._analyzer = VectorTrendingAnalyzer(
-                model_name=getattr(settings, "TRENDING_MODEL_NAME", "all-MiniLM-L6-v2"),
+                model_name=getattr(
+                    settings, "TRENDING_MODEL_NAME", "paraphrase-albert-small-v2"
+                ),
                 similarity_threshold=getattr(
                     settings, "TRENDING_SIMILARITY_THRESHOLD", 0.7
                 ),
@@ -183,7 +185,9 @@ class SimilarQueriesView(APIView):
     def analyzer(self) -> VectorTrendingAnalyzer:
         if self._analyzer is None:
             self._analyzer = VectorTrendingAnalyzer(
-                model_name=getattr(settings, "TRENDING_MODEL_NAME", "all-MiniLM-L6-v2"),
+                model_name=getattr(
+                    settings, "TRENDING_MODEL_NAME", "paraphrase-albert-small-v2"
+                ),
                 batch_size=getattr(settings, "TRENDING_BATCH_SIZE", 32),
             )
         return self._analyzer  # type: ignore[return-value]
@@ -245,7 +249,9 @@ class TrendingHealthView(APIView):
     def get(self, request: Request) -> Response:
         try:
             dependencies = self._check_dependencies()
-            model_name = getattr(settings, "TRENDING_MODEL_NAME", "all-MiniLM-L6-v2")
+            model_name = getattr(
+                settings, "TRENDING_MODEL_NAME", "paraphrase-albert-small-v2"
+            )
             embedding_dimensions = 0
 
             if dependencies["sentence_transformers"] and dependencies["sklearn"]:

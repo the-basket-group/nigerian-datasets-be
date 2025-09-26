@@ -16,7 +16,7 @@ class VectorTrendingAnalyzer:
 
     def __init__(
         self,
-        model_name: str = "all-MiniLM-L6-v2",
+        model_name: str = "paraphrase-albert-small-v2",
         similarity_threshold: float = 0.7,
         batch_size: int = 32,
     ):
