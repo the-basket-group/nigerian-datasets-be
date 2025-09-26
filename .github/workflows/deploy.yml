@@ -104,7 +104,7 @@ jobs:
             --platform managed \
             --region us-central1 \
             --allow-unauthenticated \
-            --memory 512Mi \
+            --memory 1Gi \
             --cpu 1 \
             --max-instances 10 \
             --set-env-vars "DEBUG=${DEBUG}" \

@@ -12,12 +12,13 @@ class TrendsConfig(AppConfig):
 
     def ready(self) -> None:
         """Initialize the sentence transformer model when Django starts."""
-        if not getattr(settings, "TESTING", False):  # Skip during tests
+        # Only load model in production Cloud Run environment
+        if not getattr(settings, "TESTING", False) and not settings.DEBUG:
             try:
                 from trends.model_cache import model_cache
 
                 model_name = getattr(
-                    settings, "TRENDING_MODEL_NAME", "all-MiniLM-L6-v2"
+                    settings, "TRENDING_MODEL_NAME", "all-MiniLM-L12-v2"
                 )
                 logger.info(f"Pre-loading trending model: {model_name}")
                 model_cache.get_model(model_name)

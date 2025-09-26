@@ -119,7 +119,7 @@ jobs:
             --platform managed \
             --region us-central1 \
             --allow-unauthenticated \
-            --memory 512Mi \
+            --memory 1Gi \
             --cpu 1 \
             --max-instances 5 \
             --tag pr-${{ github.event.number }} \
