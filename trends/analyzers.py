@@ -1,10 +1,11 @@
 import logging
 from collections import Counter
 from collections.abc import Sequence
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 import vertexai
+from django.core.cache import cache
 from sklearn.metrics.pairwise import cosine_similarity
 from vertexai.language_models import TextEmbeddingModel
 
@@ -45,20 +46,52 @@ class VertexAITrendingAnalyzer:
         logger.info(f"Initialized Vertex AI with model: {model_name}")
 
     def encode_queries(self, queries: Sequence[str]) -> np.ndarray:
-        """Get embeddings for queries."""
+        """Get embeddings for queries, using caching."""
         if not queries:
             return np.array([])
 
+        cache_prefix = f"embedding:{self.model_name}:"
+        cached_embeddings = {}
+        uncached_queries = []
+
+        for query in queries:
+            cache_key = f"{cache_prefix}{query}"
+            embedding = cache.get(cache_key)
+            if embedding is not None:
+                cached_embeddings[query] = embedding
+            else:
+                uncached_queries.append(query)
+
+        if not uncached_queries:
+            return np.array([cached_embeddings[q] for q in queries])
+
+        new_embeddings = {}
         try:
-            embeddings = []
-            for i in range(0, len(queries), self.batch_size):
-                batch = list(queries[i : i + self.batch_size])
-                batch_embeddings = self.model.get_embeddings(cast(list, batch))
-                embeddings.extend([emb.values for emb in batch_embeddings])
-            return np.array(embeddings)
+            for i in range(0, len(uncached_queries), self.batch_size):
+                batch = uncached_queries[i : i + self.batch_size]
+                batch_embeddings = self.model.get_embeddings(list(batch))
+                for query, embedding in zip(batch, batch_embeddings, strict=True):
+                    new_embeddings[query] = embedding.values
+                    cache_key = f"{cache_prefix}{query}"
+                    cache.set(cache_key, embedding.values, timeout=None)
+
         except Exception as e:
             logger.error(f"Error encoding queries: {e}")
             return np.array([])
+
+        final_embeddings = []
+        for query in queries:
+            if query in cached_embeddings:
+                final_embeddings.append(cached_embeddings[query])
+            elif query in new_embeddings:
+                final_embeddings.append(new_embeddings[query])
+            else:
+                logger.warning(
+                    f"Could not find or generate embedding for query: {query}"
+                )
+                pass
+
+        return np.array(final_embeddings)
 
     def analyze_trending(
         self, queries: Sequence[str], top_n: int = 10

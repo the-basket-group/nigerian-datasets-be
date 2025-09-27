@@ -1,6 +1,7 @@
 import logging
 
 from django.conf import settings
+from django.core.cache import cache
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import status
@@ -76,12 +77,20 @@ class TrendingAnalysisView(BaseVertexAIView):
         days = max(1, min(365, int(request.query_params.get("days", 30))))
         limit = max(1, min(50, int(request.query_params.get("limit", 10))))
 
+        cache_key = f"trending_analysis:{days}:{limit}"
+        cached_result = cache.get(cache_key)
+        if cached_result:
+            return Response(cached_result)
+
         queries = SearchQuery.objects.get_recent_queries(days)
         if not queries:
             return Response(self.analyzer._empty_response())
 
         result = self.analyzer.analyze_trending(queries, top_n=limit)
         result["analysis_stats"]["data_source"] = f"user_searches_last_{days}_days"
+
+        cache.set(cache_key, result, timeout=3600)
+
         return Response(result)
 
 
