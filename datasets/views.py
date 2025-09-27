@@ -2,6 +2,7 @@ import hashlib
 import os
 from typing import Any
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Q, QuerySet
 from rest_framework.exceptions import ValidationError
@@ -197,10 +198,25 @@ class SearchDatasetView(APIView):
         # Save user search query for trending analysis
         if request.user.is_authenticated and "search" in filters:
             try:
+                from trends.analyzers import VertexAITrendingAnalyzer
                 from trends.models import SearchQuery
 
+                query_text = filters["search"].strip()
+                embedding = None
+
+                # Generate embedding
+                try:
+                    project_id = getattr(settings, "GOOGLE_CLOUD_PROJECT", None)
+                    if project_id:
+                        analyzer = VertexAITrendingAnalyzer(project_id=project_id)
+                        embeddings = analyzer.encode_queries([(query_text, None)])
+                        if embeddings.size > 0:
+                            embedding = embeddings[0].tolist()
+                except Exception:
+                    pass
+
                 SearchQuery.objects.create(
-                    user=request.user, query=filters["search"].strip()
+                    user=request.user, query=query_text, embedding=embedding
                 )
             except Exception:
                 pass

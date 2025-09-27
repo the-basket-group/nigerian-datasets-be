@@ -82,14 +82,14 @@ class TrendingAnalysisView(BaseVertexAIView):
         if cached_result:
             return Response(cached_result)
 
-        queries = SearchQuery.objects.get_recent_queries(days)
-        if not queries:
+        query_data = SearchQuery.objects.get_recent_queries(days)
+        if not query_data:
             return Response(self.analyzer._empty_response())
 
-        result = self.analyzer.analyze_trending(queries, top_n=limit)
+        result = self.analyzer.analyze_trending(query_data, top_n=limit)
         result["analysis_stats"]["data_source"] = f"user_searches_last_{days}_days"
 
-        cache.set(cache_key, result, timeout=3600)
+        cache.set(cache_key, result, timeout=1800)  # 30 minutes
 
         return Response(result)
 
@@ -115,20 +115,27 @@ class RelatedSearchesView(BaseVertexAIView):
         serializer.is_valid(raise_exception=True)
 
         data = serializer.validated_data
+        target_query = data["target_query"]
+        top_k = data.get("top_k", 10)
 
-        # Get all unique queries from database
-        database_queries = SearchQuery.objects.get_recent_queries(30)  # Last 30 days
+        cache_key = f"similar_queries:{hash(target_query)}:{top_k}"
+        cached_result = cache.get(cache_key)
+        if cached_result:
+            return Response(cached_result)
 
+        database_query_data = SearchQuery.objects.get_recent_queries(30)
         similar_queries = self.analyzer.find_similar_queries(
-            database_queries, data["target_query"], data.get("top_k", 10)
+            database_query_data, target_query, top_k
         )
-        return Response(
-            {
-                "target_query": data["target_query"],
-                "similar_queries": similar_queries,
-                "total_found": len(similar_queries),
-            }
-        )
+
+        result = {
+            "target_query": target_query,
+            "similar_queries": similar_queries,
+            "total_found": len(similar_queries),
+        }
+
+        cache.set(cache_key, result, timeout=3600)
+        return Response(result)
 
 
 @extend_schema_view(
@@ -158,7 +165,9 @@ class TrendingHealthView(BaseVertexAIView):
                             project_id=project_id, model_name=model_name
                         )
                         # Test with a simple query
-                        test_embeddings = analyzer.encode_queries(["test query"])
+                        test_embeddings = analyzer.encode_queries(
+                            [("test query", None)]
+                        )
                         if len(test_embeddings) > 0:
                             embedding_dimensions = test_embeddings.shape[1]
                         dependencies["vertex_ai_connection"] = True

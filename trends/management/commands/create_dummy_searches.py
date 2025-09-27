@@ -2,9 +2,11 @@ import random
 from datetime import datetime, timedelta
 from typing import Any
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandParser
 
+from trends.analyzers import VertexAITrendingAnalyzer
 from trends.models import SearchQuery
 
 User = get_user_model()
@@ -12,6 +14,32 @@ User = get_user_model()
 
 class Command(BaseCommand):
     help = "Create dummy search queries from multiple users for testing trending functionality"
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.analyzer = None
+        try:
+            project_id = getattr(settings, "GOOGLE_CLOUD_PROJECT", None)
+            if project_id:
+                self.analyzer = VertexAITrendingAnalyzer(
+                    project_id=project_id,
+                    location=getattr(settings, "VERTEX_AI_LOCATION", "us-central1"),
+                    model_name=getattr(
+                        settings, "VERTEX_AI_MODEL", "text-multilingual-embedding-002"
+                    ),
+                )
+            else:
+                self.stderr.write(
+                    self.style.WARNING(
+                        "GOOGLE_CLOUD_PROJECT setting is not configured. Embeddings will not be generated."
+                    )
+                )
+        except Exception as e:
+            self.stderr.write(
+                self.style.ERROR(
+                    f"Failed to initialize Vertex AI analyzer: {e}. Embeddings will not be generated."
+                )
+            )
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
@@ -267,7 +295,25 @@ class Command(BaseCommand):
             )
 
             # Create search query
-            SearchQuery.objects.create(user=user, query=query, created_at=created_at)
+            embedding = None
+            if self.analyzer:
+                try:
+                    # encode_queries expects a list of (query, embedding) tuples,
+                    # but here we only have the query string.
+                    # We'll pass a list of (query, None) to match the expected signature.
+                    embeddings = self.analyzer.encode_queries([(query, None)])
+                    if embeddings.size > 0:
+                        embedding = embeddings[0].tolist()
+                except Exception as e:
+                    self.stderr.write(
+                        self.style.WARNING(
+                            f"Could not generate embedding for '{query}': {e}"
+                        )
+                    )
+
+            SearchQuery.objects.create(
+                user=user, query=query, embedding=embedding, created_at=created_at
+            )
             created_count += 1
 
         self.stdout.write(self.style.SUCCESS(f"Created {created_count} search queries"))

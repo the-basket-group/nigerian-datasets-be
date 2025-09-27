@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from collections import Counter
 from collections.abc import Sequence
@@ -45,65 +46,78 @@ class VertexAITrendingAnalyzer:
         self.model = TextEmbeddingModel.from_pretrained(model_name)
         logger.info(f"Initialized Vertex AI with model: {model_name}")
 
-    def encode_queries(self, queries: Sequence[str]) -> np.ndarray:
-        """Get embeddings for queries, using caching."""
-        if not queries:
+    def encode_queries(
+        self, query_data: Sequence[tuple[str, list[float] | None]]
+    ) -> np.ndarray:
+        """Get embeddings for queries, prioritizing pre-existing, then cache, then Vertex AI."""
+        if not query_data:
             return np.array([])
 
-        cache_prefix = f"embedding:{self.model_name}:"
-        cached_embeddings = {}
-        uncached_queries = []
+        queries = [q for q, _ in query_data]
+        final_embeddings_map = {}
+        queries_to_fetch = []
 
-        for query in queries:
-            cache_key = f"{cache_prefix}{query}"
+        for query, embedding in query_data:
+            if embedding is not None:
+                final_embeddings_map[query] = embedding
+            else:
+                queries_to_fetch.append(query)
+
+        cache_prefix = f"embedding:{self.model_name}:"
+        uncached_queries = []
+        for query in queries_to_fetch:
+            query_hash = hashlib.md5(query.encode("utf-8")).hexdigest()
+            cache_key = f"{cache_prefix}{query_hash}"
             embedding = cache.get(cache_key)
             if embedding is not None:
-                cached_embeddings[query] = embedding
+                final_embeddings_map[query] = embedding
             else:
                 uncached_queries.append(query)
 
-        if not uncached_queries:
-            return np.array([cached_embeddings[q] for q in queries])
-
         new_embeddings = {}
-        try:
-            for i in range(0, len(uncached_queries), self.batch_size):
-                batch = uncached_queries[i : i + self.batch_size]
-                batch_embeddings = self.model.get_embeddings(list(batch))
-                for query, embedding in zip(batch, batch_embeddings, strict=True):
-                    new_embeddings[query] = embedding.values
-                    cache_key = f"{cache_prefix}{query}"
-                    cache.set(cache_key, embedding.values, timeout=None)
+        if uncached_queries:
+            try:
+                for i in range(0, len(uncached_queries), self.batch_size):
+                    batch = uncached_queries[i : i + self.batch_size]
+                    batch_embeddings = self.model.get_embeddings(list(batch))
+                    for query, text_embedding in zip(
+                        batch, batch_embeddings, strict=True
+                    ):
+                        embedding_values: list[float] = text_embedding.values
+                        new_embeddings[query] = embedding_values
+                        query_hash = hashlib.md5(query.encode("utf-8")).hexdigest()
+                        cache_key = f"{cache_prefix}{query_hash}"
+                        cache.set(cache_key, embedding_values, timeout=None)
+            except Exception as e:
+                logger.error(f"Error encoding queries from Vertex AI: {e}")
+                return np.array([])
 
-        except Exception as e:
-            logger.error(f"Error encoding queries: {e}")
-            return np.array([])
-
-        final_embeddings = []
+        final_embeddings_list = []
         for query in queries:
-            if query in cached_embeddings:
-                final_embeddings.append(cached_embeddings[query])
+            if query in final_embeddings_map:
+                final_embeddings_list.append(final_embeddings_map[query])
             elif query in new_embeddings:
-                final_embeddings.append(new_embeddings[query])
+                final_embeddings_list.append(new_embeddings[query])
             else:
                 logger.warning(
                     f"Could not find or generate embedding for query: {query}"
                 )
-                pass
+                return np.array([])
 
-        return np.array(final_embeddings)
+        return np.array(final_embeddings_list)
 
     def analyze_trending(
-        self, queries: Sequence[str], top_n: int = 10
+        self, query_data: Sequence[tuple[str, list[float] | None]], top_n: int = 10
     ) -> dict[str, Any]:
         """Analyze trending patterns."""
-        if not queries:
+        if not query_data:
             return self._empty_response()
 
+        queries = [q for q, _ in query_data]
         query_counts = Counter(queries)
 
         try:
-            embeddings = self.encode_queries(queries)
+            embeddings = self.encode_queries(query_data)
             if embeddings.size > 0:
                 categories = self._semantic_clustering(queries, embeddings, top_n)
                 method = "vertex_ai_embeddings"
@@ -127,23 +141,35 @@ class VertexAITrendingAnalyzer:
         }
 
     def find_similar_queries(
-        self, queries: Sequence[str], target_query: str, top_k: int = 10
+        self,
+        query_data: Sequence[tuple[str, list[float] | None]],
+        target_query: str,
+        top_k: int = 10,
     ) -> list[dict[str, Any]]:
         """Find similar queries."""
-        if not queries or not target_query:
+        if not query_data or not target_query:
             return []
 
+        original_queries = [q for q, _ in query_data]
+
+        target_query_data = [(target_query, None)]
+
+        all_query_data = target_query_data + list(query_data)
+
         try:
-            embeddings = self.encode_queries([target_query] + list(queries))
+            embeddings = self.encode_queries(all_query_data)
             if embeddings.size == 0:
                 return []
 
-            similarities = cosine_similarity(embeddings[0:1], embeddings[1:])[0]
+            target_embedding = embeddings[0:1]
+            other_embeddings = embeddings[1:]
+
+            similarities = cosine_similarity(target_embedding, other_embeddings)[0]
             similar_indices = np.argsort(similarities)[::-1][:top_k]
 
             return [
                 {
-                    "query": queries[idx],
+                    "query": original_queries[idx],
                     "similarity_score": float(similarities[idx]),
                     "rank": i + 1,
                 }
