@@ -3,6 +3,8 @@ from rest_framework.permissions import BasePermission
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
+from users.models import User
+
 
 def is_accessible(*roles: str) -> type[BasePermission]:
     class _IsAccessible(BasePermission):
@@ -10,6 +12,7 @@ def is_accessible(*roles: str) -> type[BasePermission]:
             user = request.user
             if not user or not user.is_authenticated:
                 return False
+            assert isinstance(user, User)
             if len(roles) == 0:
                 return True
             if user.role not in roles:

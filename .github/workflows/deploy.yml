@@ -77,6 +77,9 @@ jobs:
           GOOGLE_REDIRECT_URI: ${{ vars.GOOGLE_REDIRECT_URI }}
           GOOGLE_AUTH_SCOPE: ${{ vars.GOOGLE_AUTH_SCOPE }}
           BUCKET_NAME: ${{ vars.BUCKET_NAME }}
+          GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT }}
+          VERTEX_AI_LOCATION: ${{ vars.VERTEX_AI_LOCATION }}
+          VERTEX_AI_MODEL: ${{ vars.VERTEX_AI_MODEL }}
           SERVICE_EXISTS: ${{ steps.check_service.outputs.SERVICE_EXISTS }}
           EXISTING_HOST: ${{ steps.check_service.outputs.SERVICE_HOST }}
         run: |
@@ -101,7 +104,7 @@ jobs:
             --platform managed \
             --region us-central1 \
             --allow-unauthenticated \
-            --memory 512Mi \
+            --memory 1Gi \
             --cpu 1 \
             --max-instances 10 \
             --set-env-vars "DEBUG=${DEBUG}" \
@@ -118,6 +121,9 @@ jobs:
             --set-env-vars "^@^GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}" \
             --set-env-vars "^@^GOOGLE_AUTH_SCOPE=${GOOGLE_AUTH_SCOPE}" \
             --set-env-vars "BUCKET_NAME=${BUCKET_NAME}" \
+            --set-env-vars "GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}" \
+            --set-env-vars "VERTEX_AI_LOCATION=${VERTEX_AI_LOCATION}" \
+            --set-env-vars "VERTEX_AI_MODEL=${VERTEX_AI_MODEL}" \
             --set-env-vars "ALLOWED_HOSTS=${ALLOWED_HOSTS_VALUE}" 2>&1)
 
           echo "$DEPLOY_OUTPUT"
