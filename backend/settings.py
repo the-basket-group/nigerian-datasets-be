@@ -141,6 +141,7 @@ if not DEBUG:
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": ["users.auth.JWTAuthentication"],
+    "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",
 }
 
 SPECTACULAR_SETTINGS = {
@@ -171,11 +172,7 @@ LOGGING = {
     },
 }
 
-# Trending Analysis Settings
-TRENDING_MODEL_NAME = os.environ.get(
-    "TRENDING_MODEL_NAME", "paraphrase-albert-small-v2"
-)
-TRENDING_SIMILARITY_THRESHOLD = float(
-    os.environ.get("TRENDING_SIMILARITY_THRESHOLD", "0.7")
-)
-TRENDING_BATCH_SIZE = int(os.environ.get("TRENDING_BATCH_SIZE", "32"))
+# Vertex AI Settings
+GOOGLE_CLOUD_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT")
+VERTEX_AI_LOCATION = os.environ.get("VERTEX_AI_LOCATION", "us-central1")
+VERTEX_AI_MODEL = os.environ.get("VERTEX_AI_MODEL", "text-multilingual-embedding-002")

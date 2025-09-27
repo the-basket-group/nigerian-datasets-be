@@ -1,157 +1,113 @@
 import logging
 from collections import Counter
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, cast
 
 import numpy as np
-from sklearn.cluster import DBSCAN, KMeans
+import vertexai
 from sklearn.metrics.pairwise import cosine_similarity
-
-from trends.model_cache import model_cache
+from vertexai.language_models import TextEmbeddingModel
 
 logger = logging.getLogger(__name__)
 
+try:
+    import nltk
+    from nltk.corpus import stopwords
 
-class VectorTrendingAnalyzer:
-    """Vector-based trending analysis with semantic clustering."""
+    ENGLISH_STOPWORDS = set(stopwords.words("english"))
+except LookupError:
+    import nltk
+
+    nltk.download("stopwords", quiet=True)
+    from nltk.corpus import stopwords
+
+    ENGLISH_STOPWORDS = set(stopwords.words("english"))
+
+ENGLISH_STOPWORDS.update({"data", "statistics", "nigeria", "nigerian"})
+
+
+class VertexAITrendingAnalyzer:
+    """Vertex AI trending analyzer."""
 
     def __init__(
         self,
-        model_name: str = "paraphrase-albert-small-v2",
-        similarity_threshold: float = 0.7,
-        batch_size: int = 32,
+        project_id: str,
+        location: str = "us-central1",
+        model_name: str = "text-multilingual-embedding-002",
     ):
+        self.project_id = project_id
         self.model_name = model_name
-        self.similarity_threshold = max(0.1, min(0.99, similarity_threshold))
-        self.batch_size = batch_size
+        self.similarity_threshold = 0.7
+        self.batch_size = 32
 
-    @property
-    def model(self) -> Any:
-        try:
-            return model_cache.get_model(self.model_name)
-        except ImportError as e:
-            raise ImportError(
-                "sentence-transformers required: pip install sentence-transformers"
-            ) from e
+        vertexai.init(project=project_id, location=location)
+        self.model = TextEmbeddingModel.from_pretrained(model_name)
+        logger.info(f"Initialized Vertex AI with model: {model_name}")
 
-    def encode_queries(self, queries: list[str]) -> np.ndarray:
+    def encode_queries(self, queries: Sequence[str]) -> np.ndarray:
+        """Get embeddings for queries."""
         if not queries:
             return np.array([])
-        processed = [q.lower().strip() for q in queries]
-        return self.model.encode(  # type: ignore[no-any-return]
-            processed, batch_size=self.batch_size, normalize_embeddings=True
-        )
+
+        try:
+            embeddings = []
+            for i in range(0, len(queries), self.batch_size):
+                batch = list(queries[i : i + self.batch_size])
+                batch_embeddings = self.model.get_embeddings(cast(list, batch))
+                embeddings.extend([emb.values for emb in batch_embeddings])
+            return np.array(embeddings)
+        except Exception as e:
+            logger.error(f"Error encoding queries: {e}")
+            return np.array([])
 
     def analyze_trending(
-        self, queries: list[str], min_cluster_size: int = 2, top_n: int = 10
+        self, queries: Sequence[str], top_n: int = 10
     ) -> dict[str, Any]:
+        """Analyze trending patterns."""
         if not queries:
-            return {
-                "method": "vector_embeddings",
-                "trending_categories": [],
-                "similarity_analysis": {
-                    "avg_global_similarity": 0.0,
-                    "max_similarity": 0.0,
-                },
-                "analysis_stats": {
-                    "total_queries": 0,
-                    "unique_queries": 0,
-                    "clusters_created": 0,
-                    "embedding_dimensions": 0,
-                    "clustering_method": "none",
-                },
-            }
+            return self._empty_response()
 
-        if len(set(queries)) <= 1:
-            unique_query = queries[0]
-            return {
-                "method": "single_query",
-                "trending_categories": [
-                    {
-                        "category_name": unique_query,
-                        "query_count": len(queries),
-                        "percentage_of_total": 100.0,
-                        "avg_similarity": 1.0,
-                        "top_keywords": unique_query.lower().split()[:5],
-                        "sample_queries": [unique_query],
-                        "representative_query": unique_query,
-                    }
-                ],
-                "similarity_analysis": {
-                    "avg_global_similarity": 1.0,
-                    "max_similarity": 1.0,
-                },
-                "analysis_stats": {
-                    "total_queries": len(queries),
-                    "unique_queries": 1,
-                    "clusters_created": 1,
-                    "embedding_dimensions": 0,
-                    "clustering_method": "single_query",
-                },
-            }
+        query_counts = Counter(queries)
 
         try:
             embeddings = self.encode_queries(queries)
-            clusters, cluster_method = self._cluster_embeddings(
-                embeddings, min_cluster_size
-            )
-            categories = self._analyze_clusters(queries, clusters, embeddings, top_n)
-            similarity = self._calculate_similarity_metrics(embeddings)
-
-            return {
-                "method": "vector_embeddings",
-                "trending_categories": categories,
-                "similarity_analysis": similarity,
-                "analysis_stats": {
-                    "total_queries": len(queries),
-                    "unique_queries": len(set(queries)),
-                    "clusters_created": len(set(clusters))
-                    - (1 if -1 in clusters else 0),
-                    "embedding_dimensions": (
-                        embeddings.shape[1] if len(embeddings) > 0 else 0
-                    ),
-                    "clustering_method": cluster_method,
-                },
-            }
+            if embeddings.size > 0:
+                categories = self._semantic_clustering(queries, embeddings, top_n)
+                method = "vertex_ai_embeddings"
+            else:
+                categories = self._frequency_clustering(query_counts, top_n)
+                method = "frequency_fallback"
         except Exception:
-            query_counts = Counter(queries)
-            categories = [
-                {
-                    "category_name": q,
-                    "query_count": c,
-                    "percentage_of_total": (c / len(queries)) * 100,
-                    "avg_similarity": 1.0,
-                    "top_keywords": q.lower().split()[:5],
-                    "sample_queries": [q],
-                    "representative_query": q,
-                }
-                for q, c in query_counts.most_common(top_n)
-            ]
-            return {
-                "method": "frequency_fallback",
-                "trending_categories": categories,
-                "similarity_analysis": {
-                    "avg_global_similarity": 0.0,
-                    "max_similarity": 1.0,
-                },
-                "analysis_stats": {
-                    "total_queries": len(queries),
-                    "unique_queries": len(query_counts),
-                    "clusters_created": len(categories),
-                    "embedding_dimensions": 0,
-                    "clustering_method": "frequency_based",
-                },
-            }
+            categories = self._frequency_clustering(query_counts, top_n)
+            method = "frequency_fallback"
+
+        return {
+            "method": method,
+            "trending_categories": categories,
+            "analysis_stats": {
+                "total_queries": len(queries),
+                "unique_queries": len(query_counts),
+                "clusters_created": len(categories),
+                "model_name": self.model_name,
+                "data_source": "user_searches",
+            },
+        }
 
     def find_similar_queries(
-        self, queries: list[str], target_query: str, top_k: int = 10
+        self, queries: Sequence[str], target_query: str, top_k: int = 10
     ) -> list[dict[str, Any]]:
+        """Find similar queries."""
         if not queries or not target_query:
             return []
 
         try:
-            embeddings = self.encode_queries([target_query] + queries)
+            embeddings = self.encode_queries([target_query] + list(queries))
+            if embeddings.size == 0:
+                return []
+
             similarities = cosine_similarity(embeddings[0:1], embeddings[1:])[0]
             similar_indices = np.argsort(similarities)[::-1][:top_k]
+
             return [
                 {
                     "query": queries[idx],
@@ -161,106 +117,111 @@ class VectorTrendingAnalyzer:
                 for i, idx in enumerate(similar_indices)
                 if similarities[idx] >= 0.1
             ]
-        except Exception:
+        except Exception as e:
+            logger.error(f"Similar queries failed: {e}")
             return []
 
-    def _cluster_embeddings(
-        self, embeddings: np.ndarray, min_cluster_size: int
-    ) -> tuple[list[int], str]:
-        eps = 1 - self.similarity_threshold
-        dbscan_labels = DBSCAN(
-            eps=eps, min_samples=min_cluster_size, metric="cosine"
-        ).fit_predict(embeddings)
-        n_clusters = len(set(dbscan_labels)) - (1 if -1 in dbscan_labels else 0)
-
-        if 2 <= n_clusters <= len(embeddings) // 2:
-            return dbscan_labels.tolist(), "DBSCAN"
-
-        n_kmeans = min(max(2, len(embeddings) // 3), 10)
-        kmeans_labels = KMeans(
-            n_clusters=n_kmeans, random_state=42, n_init=10
-        ).fit_predict(embeddings)
-        return kmeans_labels.tolist(), "KMeans"
-
-    def _analyze_clusters(
-        self,
-        queries: list[str],
-        cluster_labels: list[int],
-        embeddings: np.ndarray,
-        top_n: int,
-    ) -> list[dict[str, Any]]:
-        cluster_data: dict[int, dict[str, list[Any]]] = {}
-        for i, (query, label) in enumerate(zip(queries, cluster_labels, strict=False)):
-            if label != -1:
-                if label not in cluster_data:
-                    cluster_data[label] = {"queries": [], "embeddings": []}
-                cluster_data[label]["queries"].append(query)
-                cluster_data[label]["embeddings"].append(embeddings[i])
+    def _semantic_clustering(
+        self, queries: Sequence[str], embeddings: np.ndarray, top_n: int
+    ) -> list[dict]:
+        """Orchestrates the semantic clustering process."""
+        similarity_matrix = cosine_similarity(embeddings)
+        clusters = self._create_clusters(similarity_matrix)
 
         categories = []
-        for data in cluster_data.values():
-            if len(data["queries"]) < 2:
+        for cluster_indices in clusters:
+            if len(cluster_indices) < 2:
                 continue
 
-            cluster_embeddings = np.array(data["embeddings"])
-            similarities = cosine_similarity(cluster_embeddings)
-            avg_similarity = np.mean(
-                similarities[np.triu_indices_from(similarities, k=1)]
+            category = self._build_category_from_cluster(
+                cluster_indices, queries, embeddings
             )
-
-            centroid = np.mean(cluster_embeddings, axis=0)
-            rep_idx = np.argmax(cosine_similarity([centroid], cluster_embeddings)[0])
-
-            words = [
-                w
-                for q in data["queries"]
-                for w in q.lower().split()
-                if len(w) > 2
-                and w
-                not in {
-                    "the",
-                    "a",
-                    "an",
-                    "and",
-                    "or",
-                    "but",
-                    "in",
-                    "on",
-                    "at",
-                    "to",
-                    "for",
-                    "of",
-                    "with",
-                    "by",
-                }
-            ]
-            keywords = [w for w, _ in Counter(words).most_common(5)]
-            category_name = (
-                " ".join(keywords[:3])
-                if keywords
-                else " ".join(data["queries"][0].split()[:3])
-            )
-
-            categories.append(
-                {
-                    "category_name": category_name,
-                    "query_count": len(data["queries"]),
-                    "percentage_of_total": (len(data["queries"]) / len(queries)) * 100,
-                    "avg_similarity": float(avg_similarity),
-                    "top_keywords": keywords,
-                    "sample_queries": data["queries"][:3],
-                    "representative_query": data["queries"][rep_idx],
-                }
-            )
+            categories.append(category)
 
         return sorted(categories, key=lambda x: x["query_count"], reverse=True)[:top_n]
 
-    def _calculate_similarity_metrics(self, embeddings: np.ndarray) -> dict[str, float]:
-        if len(embeddings) < 2:
-            return {"avg_global_similarity": 0.0, "max_similarity": 0.0}
-        similarity_matrix = cosine_similarity(embeddings)
-        upper_triangle = similarity_matrix[np.triu_indices_from(similarity_matrix, k=1)]
+    def _create_clusters(self, similarity_matrix: np.ndarray) -> list[list[int]]:
+        """Creates clusters of queries based on similarity."""
+        clustered = set()
+        clusters = []
+        for i in range(len(similarity_matrix)):
+            if i in clustered:
+                continue
+
+            similar_indices = [
+                j
+                for j, sim in enumerate(similarity_matrix[i])
+                if sim >= self.similarity_threshold and j not in clustered
+            ]
+
+            clustered.update(similar_indices)
+            clusters.append(similar_indices)
+        return clusters
+
+    def _build_category_from_cluster(
+        self, cluster_indices: list[int], queries: Sequence[str], embeddings: np.ndarray
+    ) -> dict:
+        """Builds a category dictionary from a cluster of queries."""
+        cluster_queries = [queries[i] for i in cluster_indices]
+        cluster_embeddings = embeddings[cluster_indices]
+
+        representative_query = self._get_representative_query(
+            cluster_queries, cluster_embeddings
+        )
+        category_name = self._extract_category_name(representative_query)
+
         return {
-            "avg_global_similarity": float(np.mean(upper_triangle)),
-            "max_similarity": float(np.max(upper_triangle)),
+            "category_name": category_name,
+            "query_count": len(cluster_queries),
+            "percentage_of_total": (len(cluster_queries) / len(queries)) * 100,
+            "sample_queries": cluster_queries[:3],
+            "representative_query": representative_query,
+        }
+
+    def _get_representative_query(
+        self, cluster_queries: Sequence[str], cluster_embeddings: np.ndarray
+    ) -> str:
+        """Finds the most representative query in a cluster."""
+        centroid = np.mean(cluster_embeddings, axis=0)
+        distances = [np.linalg.norm(emb - centroid) for emb in cluster_embeddings]
+        representative_idx = np.argmin(distances)
+        return str(cluster_queries[int(representative_idx)])
+
+    def _extract_category_name(self, representative_query: str) -> str:
+        """Extract a meaningful category name from the representative query."""
+        words = [
+            word.title()
+            for word in representative_query.lower().split()
+            if len(word) > 2 and word not in ENGLISH_STOPWORDS and word.isalpha()
+        ]
+
+        return " ".join(words[:3]) if words else representative_query.title()
+
+    def _frequency_clustering(self, query_counts: Counter, top_n: int) -> list[dict]:
+        """Simple frequency-based clustering."""
+        total_queries = sum(query_counts.values())
+
+        return [
+            {
+                "category_name": query,
+                "query_count": count,
+                "percentage_of_total": (count / total_queries) * 100,
+                "sample_queries": [query],
+                "representative_query": query,
+            }
+            for query, count in query_counts.most_common(top_n)
+        ]
+
+    def _empty_response(self) -> dict[str, Any]:
+        """Empty response structure."""
+        return {
+            "method": "no_data",
+            "trending_categories": [],
+            "analysis_stats": {
+                "total_queries": 0,
+                "unique_queries": 0,
+                "clusters_created": 0,
+                "model_name": self.model_name,
+                "data_source": "user_searches",
+            },
         }

@@ -5,11 +5,11 @@ from datetime import datetime
 from typing import Any, TypedDict
 from uuid import UUID
 
+import google.cloud.storage as storage
 import pandas as pd
 from background_task import background
 from charset_normalizer import from_bytes
 from django.core.files.uploadedfile import InMemoryUploadedFile
-from google.cloud import storage
 from google.oauth2 import service_account
 from pandas.api.types import infer_dtype, is_numeric_dtype
 

@@ -194,6 +194,17 @@ class SearchDatasetView(APIView):
         if "sort_keys" in filters:
             dataset_query.order_by(*filters["sort_keys"])
 
+        # Save user search query for trending analysis
+        if request.user.is_authenticated and "search" in filters:
+            try:
+                from trends.models import SearchQuery
+
+                SearchQuery.objects.create(
+                    user=request.user, query=filters["search"].strip()
+                )
+            except Exception:
+                pass
+
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(dataset_query, request)
 

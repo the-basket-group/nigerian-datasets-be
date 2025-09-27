@@ -115,7 +115,7 @@ jobs:
           DB_PASSWORD: postgres
           DB_HOST: localhost
           DB_PORT: 5432
-          TRENDING_MODEL_NAME: paraphrase-albert-small-v2
-          TRENDING_SIMILARITY_THRESHOLD: 0.7
-          TRENDING_BATCH_SIZE: 32
+          GOOGLE_CLOUD_PROJECT: test-project
+          VERTEX_AI_LOCATION: us-central1
+          VERTEX_AI_MODEL: text-multilingual-embedding-002
         run: uv run python manage.py test
