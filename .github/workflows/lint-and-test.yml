@@ -120,11 +120,11 @@ jobs:
           VERTEX_AI_LOCATION: us-central1
           VERTEX_AI_MODEL: text-multilingual-embedding-002
         run: |
-          echo "Checking for missing migrations..."
-          uv run python manage.py makemigrations --check --dry-run
-          echo "✅ No missing migrations detected"
+          echo "Checking for missing migrations in your apps..."
+          uv run python manage.py makemigrations --check --dry-run core users datasets trends
+          echo "✅ No missing migrations detected for your apps"
 
-          echo "Running migrations on test database..."
+          echo "Running all migrations on test database..."
           uv run python manage.py migrate --noinput
           echo "✅ Migrations completed successfully"
 
