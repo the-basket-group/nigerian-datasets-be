@@ -126,7 +126,7 @@ jobs:
 
           echo "Running all migrations on test database..."
           uv run python manage.py migrate --noinput
-          echo "✅ Migrations completed successfully"
+          echo "✅ Migrations all completed successfully"
 
       - name: Run tests
         env:
