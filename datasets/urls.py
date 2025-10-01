@@ -4,6 +4,7 @@ from datasets.views import (
     DeleteDatasetFileView,
     DeleteDatasetVersionView,
     DeleteDatasetView,
+    DownloadDatasetFileView,
     RetrieveDatasetView,
     SearchDatasetView,
     UpdateDatasetVersion,
@@ -35,5 +36,10 @@ urlpatterns = [
         "files/<str:id>/delete/",
         DeleteDatasetFileView.as_view(),
         name="delete_dataset_file",
+    ),
+    path(
+        "files/<str:id>/download/",
+        DownloadDatasetFileView.as_view(),
+        name="download_dataset_file",
     ),
 ]

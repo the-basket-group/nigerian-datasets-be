@@ -237,3 +237,7 @@ class DatasetSearchSerializer(serializers.Serializer):
         ),
     )
     # TODO: highly_voted_for (not applicable yet)
+
+
+class DownloadDatasetFileSerializer(serializers.Serializer):
+    send_to_email = serializers.EmailField(required=False)
