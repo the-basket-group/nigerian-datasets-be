@@ -146,7 +146,7 @@ class UploadDatasetView(CreateAPIView):
         )
 
 
-class SearchDatasetView(APIView):
+class InternalDatasetSearchView(APIView):
     # TODO: user-level Dataset viewing
     queryset = Dataset.objects.all()
     pagination_class = PageNumberPagination
