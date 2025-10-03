@@ -108,6 +108,26 @@ jobs:
       - name: Run type checking
         run: uv run mypy .
 
+      - name: Check migrations
+        env:
+          DB_NAME: test_ng_datasets
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_HOST: localhost
+          DB_PORT: 5432
+          USE_POSTGRES: true
+          GOOGLE_CLOUD_PROJECT: test-project
+          VERTEX_AI_LOCATION: us-central1
+          VERTEX_AI_MODEL: text-multilingual-embedding-002
+        run: |
+          echo "Checking for missing migrations in your apps..."
+          uv run python manage.py makemigrations --check --dry-run core users datasets trends
+          echo "✅ No missing migrations detected for your apps"
+
+          echo "Running all migrations on test database..."
+          uv run python manage.py migrate --noinput
+          echo "✅ Migrations all completed successfully"
+
       - name: Run tests
         env:
           DB_NAME: test_ng_datasets
