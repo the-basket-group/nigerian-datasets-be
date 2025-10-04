@@ -82,6 +82,8 @@ jobs:
           VERTEX_AI_MODEL: ${{ vars.VERTEX_AI_MODEL }}
           SERVICE_EXISTS: ${{ steps.check_service.outputs.SERVICE_EXISTS }}
           EXISTING_HOST: ${{ steps.check_service.outputs.SERVICE_HOST }}
+          MAILGUN_API_KEY: ${{ vars.MAILGUN_API_KEY }}
+          MAILGUN_DOMAIN: ${{ vars.MAILGUN_DOMAIN }}
         run: |
           SERVICE_NAME="ng-datasets-be"
 
