@@ -97,8 +97,8 @@ jobs:
           SERVICE_EXISTS: ${{ steps.check_service.outputs.SERVICE_EXISTS }}
           EXISTING_HOST: ${{ steps.check_service.outputs.SERVICE_HOST }}
           EXISTING_URL: ${{ steps.check_service.outputs.SERVICE_URL }}
-          MAILGUN_API_KEY: ${{ vars.MAILGUN_API_KEY }}
-          MAILGUN_DOMAIN: ${{ vars.MAILGUN_DOMAIN }}
+          MAILGUN_API_KEY: ${{ secrets.MAILGUN_API_KEY }}
+          MAILGUN_DOMAIN: ${{ secrets.MAILGUN_DOMAIN }}
         run: |
           SERVICE_NAME="ng-datasets-be-pr-${{ github.event.number }}"
 
