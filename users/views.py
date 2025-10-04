@@ -8,6 +8,7 @@ import requests
 from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
+from django.template.loader import render_to_string
 from rest_framework.exceptions import APIException, ValidationError
 from rest_framework.generics import CreateAPIView
 from rest_framework.request import Request
@@ -15,6 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.config import application_config
+from core.utils import send_email
 from users.models import User
 from users.permissions import is_accessible
 from users.serializers import (
@@ -108,6 +110,17 @@ class GoogleAuthCallbackView(APIView):
                     role="member",
                 )
                 user_access_token = user.create_access_token()
+                html_message = render_to_string(
+                    "welcome_email.html",
+                    {
+                        "user_name": f"{user_profile['given_name']} {user_profile['family_name']}"
+                    },
+                )
+                send_email(
+                    emails=[user_profile["email"]],
+                    subject="Welcome to Nigerian Datasets!",
+                    content=html_message,
+                )
 
             return redirect(
                 f"{application_config.FRONTEND_URL}/auth/success?token={user_access_token}"
@@ -134,16 +147,29 @@ class RegisterUserView(CreateAPIView):
                 detail={"message": "user with username or email already exists."}
             )
 
+        first_name = serializer.validated_data["first_name"].title()
+        last_name = serializer.validated_data["last_name"].title()
+        email = serializer.validated_data["email"].lower()
         user = User.objects.create_user(
             username=serializer.validated_data["username"].lower(),
-            email=serializer.validated_data["email"].lower(),
+            email=email,
             password=serializer.validated_data["password"],
-            first_name=serializer.validated_data["first_name"].title(),
-            last_name=serializer.validated_data["last_name"].title(),
+            first_name=first_name,
+            last_name=last_name,
             status="active",
             avatar_url="",
             role="member",
         )
+
+        html_message = render_to_string(
+            "welcome_email.html", {"user_name": f"{first_name} {last_name}"}
+        )
+        send_email(
+            emails=[email],
+            subject="Welcome to Nigerian Datasets!",
+            content=html_message,
+        )
+
         user_response = UserSerializer(instance=user).data
         return Response(
             data={"message": "successfully registered user", "user": user_response}

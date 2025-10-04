@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Dataset Download Link</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .warning {
+            color: #721c24;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .fallback-url {
+            word-break: break-all;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h2>Your Dataset Download is Ready</h2>
+    
+    <p>Hello,</p>
+    
+    <p>Your requested dataset is ready for download. Please click the button below to access your file:</p>
+    
+    <a href="{{ download_link }}" class="button">Download Dataset</a>
+    
+    <p style="font-size: 0.9em; color: #666;">If the button above doesn't work, copy and paste this URL into your browser:</p>
+    <div class="fallback-url">
+        {{ download_link }}
+    </div>
+    
+    <div class="warning">
+        <p><strong>Important:</strong> This download link will expire in {{ expire_time }}.</p>
+    </div>
+    
+    <p>If you have any issues accessing the file, please contact our support team.</p>
+    
+    <p>Best regards,<br>Nigerian Datasets Team</p>
+</body>
+</html>

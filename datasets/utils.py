@@ -1,7 +1,7 @@
 import csv
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, TypedDict
 from uuid import UUID
 
@@ -259,3 +259,24 @@ def delete_file_task(file_id: str | UUID) -> None:
     delete_blob(file.upload_id)
     file.delete()
     logger.info(f"DatasetFile {file_id} deleted.")
+
+
+def generate_presigned_url(
+    blob_id: str,
+    expiration: timedelta = timedelta(hours=2),
+    raise_exception: bool = True,
+) -> str | None:
+    try:
+        cred = service_account.Credentials.from_service_account_info(
+            application_config.GOOGLE_SERVICE_ACCOUNT_INFO
+        )
+        storage_client = storage.Client(credentials=cred)
+        bucket = storage_client.bucket(application_config.BUCKET_NAME)
+
+        blob = bucket.blob(blob_id.removeprefix(f"{bucket.name}/"))
+        url: str = blob.generate_signed_url(expiration=expiration)
+        return url
+    except Exception as e:
+        if not raise_exception:
+            return None
+        raise e

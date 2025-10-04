@@ -1,10 +1,12 @@
 import hashlib
 import os
+from datetime import timedelta
 from typing import Any
 
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q, QuerySet
+from django.template.loader import render_to_string
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (
     CreateAPIView,
@@ -19,12 +21,14 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.utils import send_email
 from datasets.models import Dataset, DatasetFile, DatasetVersion, Tag
 from datasets.serializers import (
     CreateDatasetSerializer,
     DatasetSearchSerializer,
     DatasetSerializer,
     DatasetVersionSerializer,
+    DownloadDatasetFileSerializer,
     UpdateDatasetSerializer,
     UpdateDatasetVersionSerializer,
 )
@@ -34,6 +38,7 @@ from datasets.utils import (
     delete_dataset_task,
     delete_file_task,
     delete_version_task,
+    generate_presigned_url,
     upload_datasetfile_to_gcloud,
 )
 from users.models import User
@@ -110,7 +115,7 @@ class UploadDatasetView(CreateAPIView):
             md5_hash = hashlib.md5(file.read()).hexdigest()
             DatasetFile.objects.create(
                 dataset_version=dataset_version,
-                upload_id=file_info.id,
+                upload_id=file_info.name,
                 upload_url=file_info.public_url or "",
                 file_format=ext,
                 file_size_bytes=file_info.size,
@@ -141,7 +146,7 @@ class UploadDatasetView(CreateAPIView):
         )
 
 
-class SearchDatasetView(APIView):
+class InternalDatasetSearchView(APIView):
     # TODO: user-level Dataset viewing
     queryset = Dataset.objects.all()
     pagination_class = PageNumberPagination
@@ -409,7 +414,7 @@ class UpdateDatasetVersion(UpdateAPIView):
                     metadata = compute_metadata(uploaded_file) or {}
                     dataset_file = DatasetFile(
                         dataset_version=new_version,
-                        upload_id=file_info.id,
+                        upload_id=file_info.name,
                         upload_url=file_info.public_url or "",
                         file_format=ext,
                         file_size_bytes=file_info.size,
@@ -541,3 +546,52 @@ class DeleteDatasetFileView(DestroyAPIView):
             },
             status=202,
         )
+
+
+class DownloadDatasetFileView(APIView):
+    def post(self, request: Request, **kwargs: Any) -> Response:
+        dataset_file_id: str = self.kwargs.get("id", "")
+        serializer = DownloadDatasetFileSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            dataset_file = DatasetFile.objects.get(
+                id=dataset_file_id, dataset__is_public=True
+            )
+            blob_id = dataset_file.upload_id
+            send_to_email = serializer.validated_data.get("send_to_email")
+            if send_to_email:
+                expiration_time = timedelta(hours=24)
+                download_url = generate_presigned_url(
+                    blob_id=blob_id, expiration=expiration_time
+                )
+                subject = "NG Datasets, Your Download is Ready!"
+                html_message = render_to_string(
+                    "download_file_email.html",
+                    {"download_link": download_url, "expire_time": expiration_time},
+                )
+                send_email(
+                    emails=[send_to_email], subject=subject, content=html_message
+                )
+                return Response(
+                    data={
+                        "success": True,
+                        "message": "A download link for this resource has been sent to your email",
+                    }
+                )
+            else:
+                direct_download_url = generate_presigned_url(
+                    blob_id=blob_id, expiration=timedelta(hours=2)
+                )
+                return Response(
+                    data={
+                        "success": True,
+                        "message": "Successfully generated download link",
+                        "download_link": direct_download_url,
+                    }
+                )
+        except DatasetFile.DoesNotExist as e:
+            raise ValidationError(
+                {
+                    "message": "dataset file does not exist or invalid permission to dowload"
+                }
+            ) from e

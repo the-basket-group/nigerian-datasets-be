@@ -31,6 +31,8 @@ class Config:
     JWT_ENCRYPTION_METHOD: str | None
     GOOGLE_SERVICE_ACCOUNT_INFO = GoogleServiceAccount | None
     BUCKET_NAME: str | None
+    MAILGUN_API_KEY: str | None
+    MAILGUN_DOMAIN: str | None
 
     def __init__(self) -> None:
         self.GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -50,6 +52,8 @@ class Config:
             os.getenv("GCP_SERVICE_ACCOUNT_KEY", "{}")
         )
         self.BUCKET_NAME = os.getenv("BUCKET_NAME")
+        self.MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY")
+        self.MAILGUN_DOMAIN = os.getenv("MAILGUN_DOMAIN")
 
 
 application_config = Config()
