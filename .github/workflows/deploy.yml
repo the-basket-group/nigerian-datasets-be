@@ -76,6 +76,7 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REDIRECT_URI: ${{ vars.GOOGLE_REDIRECT_URI }}
           GOOGLE_AUTH_SCOPE: ${{ vars.GOOGLE_AUTH_SCOPE }}
+          GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
           BUCKET_NAME: ${{ vars.BUCKET_NAME }}
           GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT }}
           VERTEX_AI_LOCATION: ${{ vars.VERTEX_AI_LOCATION }}
@@ -100,6 +101,9 @@ jobs:
             echo "Creating new main service, will update ALLOWED_HOSTS after deployment"
           fi
 
+          # Base64 encode the GCP service account key to avoid JSON parsing issues
+          GCP_KEY_BASE64=$(echo "$GCP_SERVICE_ACCOUNT_KEY" | base64 -w 0)
+
           # Deploy to Cloud Run and capture the output
           DEPLOY_OUTPUT=$(gcloud run deploy $SERVICE_NAME \
             --source . \
@@ -122,11 +126,14 @@ jobs:
             --set-env-vars "GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}" \
             --set-env-vars "^@^GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}" \
             --set-env-vars "^@^GOOGLE_AUTH_SCOPE=${GOOGLE_AUTH_SCOPE}" \
+            --set-env-vars "GCP_SERVICE_ACCOUNT_KEY=${GCP_KEY_BASE64}" \
             --set-env-vars "BUCKET_NAME=${BUCKET_NAME}" \
             --set-env-vars "GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}" \
             --set-env-vars "VERTEX_AI_LOCATION=${VERTEX_AI_LOCATION}" \
             --set-env-vars "VERTEX_AI_MODEL=${VERTEX_AI_MODEL}" \
-            --set-env-vars "ALLOWED_HOSTS=${ALLOWED_HOSTS_VALUE}" 2>&1)
+            --set-env-vars "ALLOWED_HOSTS=${ALLOWED_HOSTS_VALUE}" \
+            --set-env-vars "MAILGUN_API_KEY=${MAILGUN_API_KEY}" \
+            --set-env-vars "MAILGUN_DOMAIN=${MAILGUN_DOMAIN}" 2>&1)
 
           echo "$DEPLOY_OUTPUT"
 
