@@ -123,7 +123,7 @@ jobs:
             --set-env-vars "GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}" \
             --set-env-vars "^@^GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}" \
             --set-env-vars "^@^GOOGLE_AUTH_SCOPE=${GOOGLE_AUTH_SCOPE}" \
-            --set-env-vars "^@^GCP_SERVICE_ACCOUNT_KEY=${GCP_SERVICE_ACCOUNT_KEY}" \
+            --set-env-vars "GCP_SERVICE_ACCOUNT_KEY=${GCP_SERVICE_ACCOUNT_KEY}" \
             --set-env-vars "BUCKET_NAME=${BUCKET_NAME}" \
             --set-env-vars "GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}" \
             --set-env-vars "VERTEX_AI_LOCATION=${VERTEX_AI_LOCATION}" \
