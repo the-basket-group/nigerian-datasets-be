@@ -115,6 +115,9 @@ jobs:
             echo "🆕 Creating new PR service, will set ALLOWED_HOSTS after deployment"
           fi
 
+          # Write GCP service account key to temporary file for deployment
+          echo "$GCP_SERVICE_ACCOUNT_KEY" > /tmp/gcp-key.json
+
           # Deploy the PR-specific service
           echo "Deploying..."
           gcloud run deploy $SERVICE_NAME \
@@ -139,12 +142,15 @@ jobs:
             --set-env-vars "GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}" \
             --set-env-vars "^@^GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}" \
             --set-env-vars "^@^GOOGLE_AUTH_SCOPE=${GOOGLE_AUTH_SCOPE}" \
-            --set-env-vars "GCP_SERVICE_ACCOUNT_KEY=${GCP_SERVICE_ACCOUNT_KEY}" \
+            --set-env-vars "^:^GCP_SERVICE_ACCOUNT_KEY=$(cat /tmp/gcp-key.json)" \
             --set-env-vars "BUCKET_NAME=${BUCKET_NAME}" \
             --set-env-vars "GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}" \
             --set-env-vars "VERTEX_AI_LOCATION=${VERTEX_AI_LOCATION}" \
             --set-env-vars "VERTEX_AI_MODEL=${VERTEX_AI_MODEL}" \
             --set-env-vars "ALLOWED_HOSTS=${ALLOWED_HOSTS_VALUE}"
+
+          # Clean up temporary file
+          rm -f /tmp/gcp-key.json
 
           # If this was a NEW PR service, get its URL and update ALLOWED_HOSTS
           if [ "$SERVICE_EXISTS" = "false" ]; then
