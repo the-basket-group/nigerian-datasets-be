@@ -157,6 +157,9 @@ SPECTACULAR_SETTINGS = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    "https://ng-datasets-fe-864721386499.us-central1.run.app",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
