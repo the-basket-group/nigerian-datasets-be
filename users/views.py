@@ -16,11 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.config import application_config
-<<<<<<< HEAD
 from core.utils import EmptySerializer, send_email
-=======
-from core.utils import send_email
->>>>>>> baee3707704e794a4809547a5d5a831870c7f989
 from users.models import User
 from users.permissions import is_accessible
 from users.serializers import (
