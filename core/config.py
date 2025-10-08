@@ -51,16 +51,18 @@ class Config:
         self.JWT_ENCRYPTION_METHOD = os.getenv("JWT_ENCRYPTION_METHOD", "HS256")
 
         # Handles file path, base64, or plain JSON
-        gcp_key = os.getenv("GCP_SERVICE_ACCOUNT_KEY") or "{}"
+        gcp_key = os.getenv("GCP_SERVICE_ACCOUNT_KEY", "").strip()
 
-        if os.path.isfile(gcp_key):
+        if gcp_key and os.path.isfile(gcp_key):
             with open(gcp_key) as f:
                 gcp_key = f.read()
-        elif not gcp_key.strip().startswith("{"):
+        elif gcp_key and not gcp_key.startswith("{"):
             try:
                 gcp_key = base64.b64decode(gcp_key).decode("utf-8")
             except Exception:
-                pass
+                gcp_key = "{}"
+        elif not gcp_key:
+            gcp_key = "{}"
 
         self.GOOGLE_SERVICE_ACCOUNT_INFO = json.loads(gcp_key)
 
