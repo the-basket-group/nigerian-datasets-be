@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 from typing import TypedDict
@@ -48,9 +49,21 @@ class Config:
             "JWT_ACCESS_TOKEN_SECRET", "jwt-secret-key"
         )
         self.JWT_ENCRYPTION_METHOD = os.getenv("JWT_ENCRYPTION_METHOD", "HS256")
-        self.GOOGLE_SERVICE_ACCOUNT_INFO = json.loads(
-            os.getenv("GCP_SERVICE_ACCOUNT_KEY", "{}")
-        )
+
+        # Handles file path, base64, or plain JSON
+        gcp_key = os.getenv("GCP_SERVICE_ACCOUNT_KEY") or "{}"
+
+        if os.path.isfile(gcp_key):
+            with open(gcp_key) as f:
+                gcp_key = f.read()
+        elif not gcp_key.strip().startswith("{"):
+            try:
+                gcp_key = base64.b64decode(gcp_key).decode("utf-8")
+            except Exception:
+                pass
+
+        self.GOOGLE_SERVICE_ACCOUNT_INFO = json.loads(gcp_key)
+
         self.BUCKET_NAME = os.getenv("BUCKET_NAME")
         self.MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY")
         self.MAILGUN_DOMAIN = os.getenv("MAILGUN_DOMAIN")

@@ -97,7 +97,6 @@ class UploadDatasetView(CreateAPIView):
                     tag_list.append(tags)
 
                 dataset.tags.set(tag_list)
-
                 dataset_version = DatasetVersion.objects.create(
                     dataset=dataset,
                     version_label="v1",
