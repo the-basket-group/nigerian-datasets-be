@@ -10,22 +10,9 @@ from django.core.cache import cache
 from sklearn.metrics.pairwise import cosine_similarity
 from vertexai.language_models import TextEmbeddingModel
 
+from trends.constants import ENGLISH_STOPWORDS
+
 logger = logging.getLogger(__name__)
-
-try:
-    import nltk
-    from nltk.corpus import stopwords
-
-    ENGLISH_STOPWORDS = set(stopwords.words("english"))
-except LookupError:
-    import nltk
-
-    nltk.download("stopwords", quiet=True)
-    from nltk.corpus import stopwords
-
-    ENGLISH_STOPWORDS = set(stopwords.words("english"))
-
-ENGLISH_STOPWORDS.update({"data", "statistics", "nigeria", "nigerian"})
 
 
 class VertexAITrendingAnalyzer:

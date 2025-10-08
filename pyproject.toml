@@ -29,7 +29,6 @@ dependencies = [
     "google-cloud-bigquery>=3.26.0",
     "google-api-python-client>=2.138.0",
     "vertexai>=1.0.0",
-    "nltk>=3.9.1",
 ]
 
 [dependency-groups]
@@ -69,7 +68,7 @@ disallow_untyped_defs = true
 plugins = ["mypy_django_plugin.main"]
 
 [[tool.mypy.overrides]]
-module = ["background_task.*", "sklearn.*", "nltk.*", "google.cloud.*", "google.*", "google.cloud.storage.*"]
+module = ["background_task.*", "sklearn.*", "google.cloud.*", "google.*", "google.cloud.storage.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
