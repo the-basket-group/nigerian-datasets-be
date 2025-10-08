@@ -1,4 +1,5 @@
 import requests
+from rest_framework import serializers
 
 from core.config import application_config
 
@@ -22,3 +23,7 @@ def send_email(
         response.raise_for_status()
 
     return response.ok
+
+
+class EmptySerializer(serializers.Serializer):
+    pass

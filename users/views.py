@@ -16,7 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.config import application_config
-from core.utils import send_email
+from core.utils import EmptySerializer, send_email
 from users.models import User
 from users.permissions import is_accessible
 from users.serializers import (
@@ -35,6 +35,8 @@ class GoogleUserInfoResponse(TypedDict):
 
 
 class InitialGoogleSignInView(APIView):
+    serializer_class = EmptySerializer
+
     def get(self, request: Request) -> Response:
         if (
             not application_config.GOOGLE_CLIENT_ID
@@ -61,6 +63,8 @@ class InitialGoogleSignInView(APIView):
 
 
 class GoogleAuthCallbackView(APIView):
+    serializer_class = EmptySerializer
+
     def get(self, request: Request) -> HttpResponseRedirect:
         try:
             if (
@@ -207,6 +211,7 @@ class LoginUserView(APIView):
 
 class TestAuthView(APIView):
     permission_classes = [is_accessible("admin")]
+    serializer_class = EmptySerializer
 
     def get(self, request: Request) -> Response:
         return Response(data={"success": True})

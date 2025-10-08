@@ -7,6 +7,7 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.template.loader import render_to_string
+from drf_spectacular.utils import extend_schema
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (
     CreateAPIView,
@@ -21,7 +22,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.utils import send_email
+from core.utils import EmptySerializer, send_email
 from datasets.models import Dataset, DatasetFile, DatasetVersion, Tag
 from datasets.serializers import (
     CreateDatasetSerializer,
@@ -69,87 +70,100 @@ class UploadDatasetView(CreateAPIView):
             else None
         )
 
-        dataset = Dataset.objects.create(
-            title=serializer.validated_data["title"],
-            description=serializer.validated_data.get("description", ""),
-            license=serializer.validated_data.get("license", ""),
-            source_org=serializer.validated_data.get("source_org", ""),
-            geography=serializer.validated_data.get("geography", "Nigeria"),
-            update_frequency=serializer.validated_data.get("update_frequency", "never"),
-            is_public=serializer.validated_data.get("is_public", False),
-            metadata=serializer.validated_data.get("metadata", {}),
-            status=serializer.validated_data.get("status", "draft"),
-            owner=owner,
-            is_approved=is_approved,
-            approved_by=approved_by,
-        )
-
-        # Dataset tags added
-        tags_data = serializer.validated_data.get("tags", [])
-        tag_list = []
-        for tag_name in tags_data:
-            tags, _ = Tag.objects.get_or_create(name=tag_name.strip().lower())
-            tag_list.append(tags)
-
-        dataset.tags.set(tag_list)
-
-        dataset_version = DatasetVersion.objects.create(
-            dataset=dataset,
-            version_label="v1",
-            version_number=1,
-            metadata={},
-            changelog=[],
-            owner=owner,
-        )
-
-        for file in request.FILES.getlist("files"):
-            file.seek(0)
-            file_info = upload_datasetfile_to_gcloud(file)
-            _, ext = os.path.splitext(file.name)
-            ext = ext.replace(".", "")
-            metadata: dict[Any, Any] | None = compute_metadata(file)
-            if metadata is None:
-                metadata = {}
-
-            file.seek(0)
-            md5_hash = hashlib.md5(file.read()).hexdigest()
-            DatasetFile.objects.create(
-                dataset_version=dataset_version,
-                upload_id=file_info.name,
-                upload_url=file_info.public_url or "",
-                file_format=ext,
-                file_size_bytes=file_info.size,
-                checksum=md5_hash,
-                owner=owner,
-                metadata={
-                    "file_info": metadata.get("file_info"),
-                    "structure": metadata.get("structure"),
-                    "extraction_timestamp": metadata.get("extraction_timestamp"),
-                    "failure_reason": metadata.get("failure_reason"),
-                    "meta_generation_failure": metadata.get(
-                        "meta_generation_failure", False
+        try:
+            with transaction.atomic():
+                dataset = Dataset.objects.create(
+                    title=serializer.validated_data["title"],
+                    description=serializer.validated_data.get("description", ""),
+                    license=serializer.validated_data.get("license", ""),
+                    source_org=serializer.validated_data.get("source_org", ""),
+                    geography=serializer.validated_data.get("geography", "Nigeria"),
+                    update_frequency=serializer.validated_data.get(
+                        "update_frequency", "never"
                     ),
-                    "meta_generation_failure_timestamp": metadata.get(
-                        "meta_generation_failure_timestamp"
-                    ),
-                },
-                column_schema=metadata.get("column_schema", []),
-                dataset=dataset,
+                    is_public=serializer.validated_data.get("is_public", False),
+                    metadata=serializer.validated_data.get("metadata", {}),
+                    status=serializer.validated_data.get("status", "draft"),
+                    owner=owner,
+                    is_approved=is_approved,
+                    approved_by=approved_by,
+                )
+
+                # Dataset tags added
+                tags_data = serializer.validated_data.get("tags", [])
+                tag_list = []
+                for tag_name in tags_data:
+                    tags, _ = Tag.objects.get_or_create(name=tag_name.strip().lower())
+                    tag_list.append(tags)
+
+                dataset.tags.set(tag_list)
+
+                dataset_version = DatasetVersion.objects.create(
+                    dataset=dataset,
+                    version_label="v1",
+                    version_number=1,
+                    metadata={},
+                    changelog=[],
+                    owner=owner,
+                )
+
+                for file in request.FILES.getlist("files"):
+                    file.seek(0)
+                    file_info = upload_datasetfile_to_gcloud(file)
+                    _, ext = os.path.splitext(file.name)
+                    ext = ext.replace(".", "")
+                    metadata: dict[Any, Any] | None = compute_metadata(file)
+                    if metadata is None:
+                        metadata = {}
+
+                    file.seek(0)
+                    md5_hash = hashlib.md5(file.read()).hexdigest()
+                    DatasetFile.objects.create(
+                        dataset_version=dataset_version,
+                        upload_id=file_info.name,
+                        upload_url=file_info.public_url or "",
+                        file_format=ext,
+                        file_size_bytes=file_info.size,
+                        checksum=md5_hash,
+                        owner=owner,
+                        metadata={
+                            "file_info": metadata.get("file_info"),
+                            "structure": metadata.get("structure"),
+                            "extraction_timestamp": metadata.get(
+                                "extraction_timestamp"
+                            ),
+                            "failure_reason": metadata.get("failure_reason"),
+                            "meta_generation_failure": metadata.get(
+                                "meta_generation_failure", False
+                            ),
+                            "meta_generation_failure_timestamp": metadata.get(
+                                "meta_generation_failure_timestamp"
+                            ),
+                        },
+                        column_schema=metadata.get("column_schema", []),
+                        dataset=dataset,
+                    )
+
+                dataset.completeness_score = compute_completeness(dataset)
+                dataset.save()
+
+                response_data = DatasetSerializer(instance=dataset)
+                return Response(
+                    data={"success": True, "dataset": response_data.data}, status=201
+                )
+        except ValidationError as e:
+            return Response(status=400, data=e.detail)
+        except Exception as e:
+            return Response(
+                status=500, data={"message": "an unexpected error occurred."}
             )
-
-        dataset.completeness_score = compute_completeness(dataset)
-        dataset.save()
-
-        response_data = DatasetSerializer(instance=dataset)
-        return Response(
-            data={"success": True, "dataset": response_data.data}, status=201
-        )
 
 
 class InternalDatasetSearchView(APIView):
     # TODO: user-level Dataset viewing
     queryset = Dataset.objects.all()
     pagination_class = PageNumberPagination
+    serializer_class = DatasetSearchSerializer
 
     def post(self, request: Request) -> Response:
         serializer = DatasetSearchSerializer(data=request.data)
@@ -243,7 +257,7 @@ class UpdateDatasetView(UpdateAPIView):
         owner: User = User.objects.get(id=str(self.request.user.id))
         return Dataset.objects.filter(owner=owner)
 
-    def update(self, request: Request) -> Response:
+    def update(self, request: Request, **kwargs: Any) -> Response:
         if not request.data:
             raise ValidationError(detail={"message": "provide data to update dataset"})
         instance = self.get_object()
@@ -471,6 +485,7 @@ class DeleteDatasetView(DestroyAPIView):
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
     lookup_url_kwarg = "id"
+    serializer_class = EmptySerializer
 
     def destroy(self, request: Request, **kwargs: Any) -> Response:
         dataset_id: str = kwargs.get("id", "")
@@ -496,6 +511,7 @@ class DeleteDatasetVersionView(DestroyAPIView):
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
     lookup_url_kwarg = "id"
+    serializer_class = EmptySerializer
 
     def destroy(self, request: Request, **kwargs: Any) -> Response:
         dataset_version_id: str = kwargs.get("id", "")
@@ -525,6 +541,7 @@ class DeleteDatasetFileView(DestroyAPIView):
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
     lookup_url_kwarg = "id"
+    serializer_class = EmptySerializer
 
     def destroy(self, request: Request, **kwargs: Any) -> Response:
         owner: User = User.objects.get(id=str(request.user.id))
@@ -549,6 +566,8 @@ class DeleteDatasetFileView(DestroyAPIView):
 
 
 class DownloadDatasetFileView(APIView):
+    serializer_class = DownloadDatasetFileSerializer
+
     def post(self, request: Request, **kwargs: Any) -> Response:
         dataset_file_id: str = self.kwargs.get("id", "")
         serializer = DownloadDatasetFileSerializer(data=request.data)
