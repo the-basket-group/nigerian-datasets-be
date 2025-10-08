@@ -7,7 +7,6 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.template.loader import render_to_string
-from drf_spectacular.utils import extend_schema
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (
     CreateAPIView,
@@ -152,7 +151,7 @@ class UploadDatasetView(CreateAPIView):
                 )
         except ValidationError as e:
             return Response(status=400, data=e.detail)
-        except Exception as e:
+        except Exception:
             return Response(
                 status=500, data={"message": "an unexpected error occurred."}
             )

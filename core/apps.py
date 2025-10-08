@@ -6,4 +6,4 @@ class CoreConfig(AppConfig):
     name = "core"
 
     def ready(self) -> None:
-        import core.extensions
+        import core.extensions  # noqa: F401
