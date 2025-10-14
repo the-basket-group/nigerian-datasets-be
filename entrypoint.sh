@@ -1,11 +1,16 @@
 #!/bin/bash
 set -e
 
-echo "Running database migrations..."
-uv run python manage.py migrate --noinput
+# Only run migrations if RUN_MIGRATIONS env var is set (for deployment time only)
+if [ "$RUN_MIGRATIONS" = "true" ]; then
+    echo "Running database migrations..."
+    python manage.py migrate --noinput
 
-echo "Collecting static files..."
-uv run python manage.py collectstatic --noinput
+    echo "Collecting static files..."
+    python manage.py collectstatic --noinput
+else
+    echo "Skipping migrations (RUN_MIGRATIONS not set)"
+fi
 
 echo "Starting server..."
-exec uv run gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2
+exec gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --worker-class gthread --threads 4

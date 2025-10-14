@@ -1,3 +1,27 @@
+# Build stage - install dependencies
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for faster dependency resolution
+RUN pip install --no-cache-dir uv
+
+# Copy dependency files first for better layer caching
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies (cached unless pyproject.toml or uv.lock changes)
+RUN uv sync --frozen --no-dev
+
+# Runtime stage - minimal image
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -6,21 +30,26 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8000
 
-RUN apt-get update && apt-get install -y \
-    build-essential \
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install uv
+# Copy installed dependencies from builder
+COPY --from=builder /app/.venv /app/.venv
 
-COPY uv.lock pyproject.toml ./
+# Use virtual environment
+ENV PATH="/app/.venv/bin:$PATH"
 
-RUN uv sync --frozen --no-dev
-
+# Copy application code
 COPY . .
 
+# Copy and set entrypoint permissions
 COPY entrypoint.sh ./
 RUN chmod +x entrypoint.sh
+
+# Pre-collect static files during build (not at runtime)
+RUN python manage.py collectstatic --noinput --clear
 
 EXPOSE $PORT
 
