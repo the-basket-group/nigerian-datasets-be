@@ -16,3 +16,35 @@ Makefile
 .ruff_cache
 node_modules
 .DS_Store
+
+# Database files
+db.sqlite3
+*.db
+*.sqlite
+*.sqlite3
+
+# Static files (should be collected in production)
+staticfiles/
+
+# Git and CI/CD
+.github/
+.git/
+.gitattributes
+
+# Tests
+tests/
+test_*.py
+*_test.py
+
+# Documentation
+docs/
+*.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local development
+.local/
