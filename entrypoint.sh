@@ -1,16 +1,21 @@
 #!/bin/bash
 set -e
 
-# Only run migrations if RUN_MIGRATIONS env var is set (for deployment time only)
-if [ "$RUN_MIGRATIONS" = "true" ]; then
+# Check if migrations are needed (only on first deployment or when migrations change)
+if python manage.py migrate --check > /dev/null 2>&1; then
+    echo "✓ Database is up to date, skipping migrations"
+else
     echo "Running database migrations..."
     python manage.py migrate --noinput
-
-    echo "Collecting static files..."
-    python manage.py collectstatic --noinput
-else
-    echo "Skipping migrations (RUN_MIGRATIONS not set)"
 fi
 
 echo "Starting server..."
-exec gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --worker-class gthread --threads 4
+exec gunicorn backend.wsgi:application \
+    --bind 0.0.0.0:$PORT \
+    --workers 1 \
+    --threads 8 \
+    --timeout 120 \
+    --worker-class gthread \
+    --preload \
+    --max-requests 1000 \
+    --max-requests-jitter 50

@@ -29,6 +29,8 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8000
+# Optimize Python startup
+ENV PYTHONOPTIMIZE=1
 
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -50,6 +52,13 @@ RUN chmod +x entrypoint.sh
 
 # Pre-collect static files during build (not at runtime)
 RUN python manage.py collectstatic --noinput --clear
+
+# Pre-compile Python files for faster startup
+RUN python -m compileall -q .
+
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
 
 EXPOSE $PORT
 
