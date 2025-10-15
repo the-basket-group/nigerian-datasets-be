@@ -3,9 +3,12 @@ from django.shortcuts import redirect
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+from datasets.moderator_admin import moderator_admin_site
+
 urlpatterns = [
     path("", lambda request: redirect("api-docs"), name="root-redirect"),
     path("admin/", admin.site.urls),
+    path("moderator/", moderator_admin_site.urls),
     path(
         "api/v1/",
         include(
