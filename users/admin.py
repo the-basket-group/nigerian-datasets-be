@@ -19,15 +19,28 @@ class UserAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         return qs
 
     def has_add_permission(self, request: HttpRequest) -> bool:
-        # Moderators cannot create users
-        if hasattr(request.user, "role") and request.user.role == "moderator":
+        # Only superusers can create users
+        if not request.user.is_superuser:
             return False
         return super().has_add_permission(request)
+
+    def has_change_permission(
+        self, request: HttpRequest, obj: User | None = None
+    ) -> bool:
+        # Moderators can only edit themselves
+        if hasattr(request.user, "role") and request.user.role == "moderator":
+            if obj is not None and obj.id != request.user.id:
+                return False
+            return True
+        # Only superusers can edit other users
+        if not request.user.is_superuser:
+            return False
+        return super().has_change_permission(request, obj)
 
     def has_delete_permission(
         self, request: HttpRequest, obj: User | None = None
     ) -> bool:
-        # Moderators cannot delete users
-        if hasattr(request.user, "role") and request.user.role == "moderator":
+        # Only superusers can delete users
+        if not request.user.is_superuser:
             return False
         return super().has_delete_permission(request, obj)
