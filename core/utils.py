@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 import requests
 from rest_framework import serializers
 
@@ -27,3 +29,14 @@ def send_email(
 
 class EmptySerializer(serializers.Serializer):
     pass
+
+
+def extract_base_url(url: str) -> str | None:
+    try:
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.hostname:
+            return None
+        netloc = f"{parsed.hostname}:{parsed.port}" if parsed.port else parsed.hostname
+        return f"{parsed.scheme}://{netloc}"
+    except Exception:
+        return None
