@@ -9,6 +9,7 @@ from django.core.files.base import File
 from rest_framework import serializers
 
 from datasets.models import Dataset, DatasetFile, DatasetVersion
+from users.serializers import UserSerializer
 
 
 class FileExtensionValidator:
@@ -131,6 +132,7 @@ class DatasetVersionSerializer(serializers.ModelSerializer):
 
 class DatasetSerializer(serializers.ModelSerializer):
     versions = DatasetVersionSerializer(many=True)
+    owner = UserSerializer()
 
     class Meta:
         model = Dataset
