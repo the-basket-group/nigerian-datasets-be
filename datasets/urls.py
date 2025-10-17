@@ -6,6 +6,7 @@ from datasets.views import (
     DeleteDatasetView,
     DownloadDatasetFileView,
     InternalDatasetSearchView,
+    ListTagsView,
     RetrieveDatasetView,
     UpdateDatasetVersion,
     UpdateDatasetView,
@@ -14,6 +15,7 @@ from datasets.views import (
 
 urlpatterns = [
     path("", UploadDatasetView.as_view(), name="upload_dataset"),
+    path("tags/", ListTagsView.as_view(), name="list_tags"),
     path("internal/search/", InternalDatasetSearchView.as_view(), name="list_datasets"),
     path("<str:id>/update/", UpdateDatasetView.as_view(), name="update_dataset"),
     path("<str:id>/view/", RetrieveDatasetView.as_view(), name="retrieve_dataset"),

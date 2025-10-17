@@ -13,6 +13,7 @@ from rest_framework.generics import (
     DestroyAPIView,
     RetrieveAPIView,
     UpdateAPIView,
+    ListAPIView
 )
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import MultiPartParser
@@ -29,6 +30,7 @@ from datasets.serializers import (
     DatasetSerializer,
     DatasetVersionSerializer,
     DownloadDatasetFileSerializer,
+    TagSerializer,
     UpdateDatasetSerializer,
     UpdateDatasetVersionSerializer,
 )
@@ -612,3 +614,13 @@ class DownloadDatasetFileView(APIView):
                     "message": "dataset file does not exist or invalid permission to dowload"
                 }
             ) from e
+            
+            
+class ListTagsView(ListAPIView):
+    serializer_class = TagSerializer
+    
+    def get_queryset(self):
+        search = self.request.GET.get('search')
+        if search:
+            return Tag.objects.filter(name__icontains=search)
+        return Tag.objects.all()
