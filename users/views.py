@@ -57,7 +57,7 @@ class InitialGoogleSignInView(APIView):
         query_params = urlencode(
             {
                 "client_id": application_config.GOOGLE_CLIENT_ID,
-                "redirect_uri": redirect_url or application_config.GOOGLE_REDIRECT_URI,
+                "redirect_uri": redirect_url,
                 "response_type": "code",
                 "scope": " ".join(application_config.GOOGLE_AUTH_SCOPE),
                 "state": referrer or str(uuid4()),
