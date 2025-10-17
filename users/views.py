@@ -9,14 +9,16 @@ from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.template.loader import render_to_string
+from django.urls import reverse
 from rest_framework.exceptions import APIException, ValidationError
 from rest_framework.generics import CreateAPIView
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.config import application_config
-from core.utils import EmptySerializer, send_email
+from core.utils import EmptySerializer, extract_base_url, send_email
 from users.models import User
 from users.permissions import is_accessible
 from users.serializers import (
@@ -44,14 +46,21 @@ class InitialGoogleSignInView(APIView):
             or not application_config.GOOGLE_REDIRECT_URI
         ):
             raise APIException(detail={"message": "service unavailable"})
+        scheme = f"{request.scheme}://"
+        redirect_url = request.build_absolute_uri(reverse("users:google_auth_callback"))
+        redirect_url = f"{redirect_url}".replace("http://", scheme)
+        referrer = request.headers.get("Referer") or request.META.get("HTTP_REFERER")
+        if referrer:
+            referrer = extract_base_url(referrer)
+
         base_url = "https://accounts.google.com/o/oauth2/v2/auth"
         query_params = urlencode(
             {
                 "client_id": application_config.GOOGLE_CLIENT_ID,
-                "redirect_uri": application_config.GOOGLE_REDIRECT_URI,
+                "redirect_uri": redirect_url or application_config.GOOGLE_REDIRECT_URI,
                 "response_type": "code",
                 "scope": " ".join(application_config.GOOGLE_AUTH_SCOPE),
-                "state": str(uuid4()),
+                "state": referrer or str(uuid4()),
                 "access_type": "offline",
                 "prompt": "consent",
             }
@@ -66,6 +75,12 @@ class GoogleAuthCallbackView(APIView):
     serializer_class = EmptySerializer
 
     def get(self, request: Request) -> HttpResponseRedirect:
+        # state is being used to store the base url of the frontend
+        state = request.GET.get("state")
+        if state:
+            state = extract_base_url(state)
+        frontend_url = state or application_config.FRONTEND_URL
+
         try:
             if (
                 not application_config.GOOGLE_CLIENT_ID
@@ -74,13 +89,19 @@ class GoogleAuthCallbackView(APIView):
             ):
                 raise APIException(detail={"message": "service unavailable"})
             code = request.GET.get("code")
+
+            scheme = f"{request.scheme}://"
+            redirect_url = request.build_absolute_uri(
+                reverse("users:google_auth_callback")
+            )
+            redirect_url = f"{redirect_url}".replace("http://", scheme)
             token_response = requests.post(
                 "https://oauth2.googleapis.com/token",
                 data={
                     "code": code,
                     "client_id": application_config.GOOGLE_CLIENT_ID,
                     "client_secret": application_config.GOOGLE_CLIENT_SECRET,
-                    "redirect_uri": application_config.GOOGLE_REDIRECT_URI,
+                    "redirect_uri": redirect_url,
                     "grant_type": "authorization_code",
                 },
             )
@@ -126,12 +147,10 @@ class GoogleAuthCallbackView(APIView):
                     content=html_message,
                 )
 
-            return redirect(
-                f"{application_config.FRONTEND_URL}/auth/success?token={user_access_token}"
-            )
+            return redirect(f"{frontend_url}/auth/success?token={user_access_token}")
         except Exception:
             message = urlencode({"message": "An unexpected error occurred"})
-            return redirect(f"{application_config.FRONTEND_URL}/auth/failure?{message}")
+            return redirect(f"{frontend_url}/auth/failure?{message}")
 
 
 class RegisterUserView(CreateAPIView):
@@ -202,7 +221,7 @@ class LoginUserView(APIView):
 
         return Response(
             data={
-                "message": "successfully registered user",
+                "message": "successfully logged in user",
                 "user": user_response,
                 "access_token": access_token,
             }
@@ -215,3 +234,12 @@ class TestAuthView(APIView):
 
     def get(self, request: Request) -> Response:
         return Response(data={"success": True})
+
+
+class GetCurrentUserView(APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserSerializer
+
+    def get(self, request: Request) -> Response:
+        serializer = UserSerializer(instance=request.user)
+        return Response(data={"success": True, "data": serializer.data})

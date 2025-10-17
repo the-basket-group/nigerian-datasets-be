@@ -8,7 +8,7 @@ import pandas as pd
 from django.core.files.base import File
 from rest_framework import serializers
 
-from datasets.models import Dataset, DatasetFile, DatasetVersion
+from datasets.models import Dataset, DatasetFile, DatasetVersion, Tag
 from users.serializers import UserSerializer
 
 
@@ -115,6 +115,12 @@ class CreateDatasetSerializer(serializers.ModelSerializer):
         ]
 
 
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = ["id", "name"]
+
+
 class DatasetFileSerializer(serializers.ModelSerializer):
     class Meta:
         model = DatasetFile
@@ -132,6 +138,7 @@ class DatasetVersionSerializer(serializers.ModelSerializer):
 
 class DatasetSerializer(serializers.ModelSerializer):
     versions = DatasetVersionSerializer(many=True)
+    tags = TagSerializer(many=True)
     owner = UserSerializer()
 
     class Meta:
